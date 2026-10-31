@@ -34,13 +34,21 @@ user must be able to say about it.
    own flow.
 3. **The naive version and its trap:** how most people write it first, and
    how that fails in production.
-4. **Theory first:** the concepts it needs, each with one targeted resource
-   (docs section, article or chapter) and what to get from it. Count this
-   reading as theory hours.
-5. **Prior art (Core only):** one or two lines on how GitHub Actions,
+4. **Theory first:** the rows of the phase file's 2a (project theory) and
+   2b (case studies) whose Before is this step: the concepts the step needs,
+   its failure cases and its scaling limits. Each with the resource,
+   sections, what to get from it and minutes; count it as theory hours.
+   Add a resource only if one is missing, and verify it. If the user has no
+   notes for these in `docs/private/notes/`, give the list and **stop**.
+   When the notes are in, review them against the stop rule, push once on
+   gaps, then continue.
+5. **Interview extras (off the clock):** the phase file's 2c rows that sit
+   next to this step's concepts, plus any the step itself raises, as a short
+   list. Not counted in project hours, and the step doesn't wait for them.
+6. **Prior art (Core only):** one or two lines on how GitHub Actions,
    CodeRabbit, Copilot code review, Semgrep, or SQS and ECS themselves
    handle it, and where Scryguard should differ.
-6. **Design questions:** 2–4 questions on shared state, races, failures,
+7. **Design questions:** 2–4 questions on shared state, races, failures,
    staleness, untrusted input and errors. For Core, ask the user to list
    the failure cases and named races before coding.
 

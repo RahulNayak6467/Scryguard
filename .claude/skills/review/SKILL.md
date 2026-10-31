@@ -51,6 +51,15 @@ as theirs.
 
 # Round 2: findings
 
+Write every important finding in story style: **What** (`file:line`, the
+code in plain words) → **The story** (the failure step by step in
+Scryguard's own flow, short lines, a small ASCII diagram for timing) →
+**Picture it** (one everyday comparison) → **Principle** → **Your move**.
+Keep the full technical depth: the real term (bold, explained in plain
+words the first time), the exact function, option or setting involved,
+and what the library or system actually does underneath. Simpler words,
+never fewer ideas.
+
 Then report what the questions didn't surface:
 
 - At most **2 important issues**, in the What / Breaks when / Principle /
@@ -61,5 +70,11 @@ Then report what the questions didn't surface:
 - The honest tier the code reaches vs its target.
 
 Write remaining important issues to the plan's Review section so `next` can
-show them; remove them when fixed. Skip what lint or typecheck catches.
+show them. Skip what lint or typecheck catches.
+
+# After the user's fix
+
+Re-read the changed scope. A finding is closed only when the fix holds and
+a test proves it (it fails with the fix reverted); then remove it from the
+Review section. A partial fix stays open with what's left.
 Never pad a clean result. Never write fixes into learn-mode code.

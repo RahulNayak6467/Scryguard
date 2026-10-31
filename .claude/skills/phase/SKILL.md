@@ -34,11 +34,23 @@ ADRs involved; the code the phase builds on. Never pull in later phases.
 
 1. **Goal:** 2–3 lines: what the phase delivers and why. Budget (T · B) and
    deadline from the plan.
-2. **Theory:** each topic with a depth label (core / supporting / breadth),
-   one specific resource (doc section, article, chapter), what to get from
-   it, hours, and the task it must come before. Verify every link before
-   writing it; mark any you couldn't open as "to verify". Hours add up to
-   the phase's T.
+2. **Theory**, in three tables. Verify every link before writing it; mark
+   any you couldn't open as "to verify". The hours of 2a and 2b add up to
+   the phase's T; 2c is off the clock.
+   - **2a. Project theory:** the concepts the phase's code uses (for
+     example caching strategies, failure cases, scaling limits). Each topic
+     with a depth label (core / supporting / breadth), one specific
+     resource (doc section, article, chapter), what to get from it, hours,
+     and the task it must come before.
+   - **2b. Case studies:** 1–3 engineering blog posts, talks or postmortems
+     on how a large company built the same thing: the problem they hit,
+     what they changed, and what Scryguard takes from it or does
+     differently. Hours and the task it must come before.
+   - **2c. Interview extras (off the clock):** concepts next to the phase's
+     topics that interviews ask but the code doesn't use (for example MVCC,
+     B-tree vs LSM, isolation levels in a PostgreSQL phase). One resource
+     each, what to be able to say, and minutes. Not counted in T or B; the
+     user reads them outside project time.
 3. **Tasks:** table of ID, task, tier · mode, hours (adding up to B, exit
    included). Under the table, per learn task: 2–3 **design questions** and
    one **done-when** line.

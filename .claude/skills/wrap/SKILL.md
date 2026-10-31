@@ -14,7 +14,8 @@ hours or hosted-model spend aren't clear, ask in one line.
 - **Now:** rewrite it (current phase, status line, next step, open
   questions). Keep it under 12 lines.
 - **Phases table:** add this session's theory and build hours to the phase's
-  actual columns.
+  actual columns. Interview extras (phase file 2c) are off the clock: never
+  count them in T.
 - **Log:** append one line:
   `YYYY-MM-DD · T <h> · B <h> · <what got done> · Hosted $<spent>`
 - Decisions the user agreed to that had real alternatives: draft an ADR in

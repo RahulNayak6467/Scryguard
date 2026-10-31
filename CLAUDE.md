@@ -116,6 +116,11 @@ sandbox isolation and error behaviour are judged at Core on every tier.
   endpoint, OpenAPI generated from Zod.
 - Money in integer micro-dollars. Stored data has a documented retention
   period.
+- Pin every external dependency to an exact version looked up at the time,
+  never from memory: images by tag + digest, npm packages exact with the
+  lockfile committed, GitHub Actions by commit SHA, Terraform providers with
+  the lock file, Ollama models by tag and digest. A new pin shows its
+  source. Dependabot keeps them current.
 - Build clients once in the composition root and inject them; no
   module-level singletons.
 - Pino structured logs with request and run IDs. Never log tokens, keys,
