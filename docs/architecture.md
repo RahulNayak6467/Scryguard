@@ -39,7 +39,7 @@ which streams them to the dashboard over SSE.
 | PostgreSQL | Source of truth: runs, agent steps, findings, outbox, code index |
 | Redis | Caches, rate limits, pub/sub for live events; holds nothing that cannot be lost |
 | SQS | Review jobs, with a dead-letter queue |
-| S3 / MinIO | Repository snapshots, sandbox results, archived logs |
+| S3 / RustFS | Repository snapshots, sandbox results, archived logs |
 
 All application processes come from one codebase ([ADR 0004](adr/0004-modular-monolith-in-a-monorepo.md)).
 
@@ -279,7 +279,7 @@ flowchart TB
 | Processes | Docker Compose | Containers on one EC2 host behind Caddy |
 | Database | PostgreSQL with pgvector | RDS PostgreSQL |
 | Queue | ElasticMQ | SQS with DLQ |
-| Object storage | MinIO | S3 |
+| Object storage | RustFS | S3 |
 | Sandbox | Docker | ECS Fargate |
 | Models | Ollama on the GPU machine | Same, over a private connection |
 | Secrets | `.env` | SSM Parameter Store |
