@@ -103,7 +103,7 @@ who accept pull requests from AI coding agents.
 | F0.6 | Liveness and readiness endpoints; graceful shutdown (stop accepting, drain, close pools) | Core |
 | F0.7 | One error envelope with stable codes; internal details never reach clients | Solid |
 | F0.8 | CI (lint, typecheck, tests, build, OpenAPI breaking-change check); gitleaks with rules for GitHub tokens and private keys; Dependabot; pre-commit hooks (lint-staged, plus the local commit-split check) | Glue |
-| F0.9 | Docker Compose for PostgreSQL 18 with pgvector, Redis, ElasticMQ and MinIO, plus Toxiproxy in front of PostgreSQL and Redis for failure tests (kept from the reused foundation); Ollama reachable from the stack | Glue |
+| F0.9 | Docker Compose for PostgreSQL 18 with pgvector, Redis, ElasticMQ and RustFS (S3-compatible), plus Toxiproxy in front of PostgreSQL and Redis for failure tests (kept from the reused foundation); Ollama reachable from the stack | Glue |
 | F0.10 | HTTP edges: request IDs, a body-size limit applied before parsing, security headers | Solid |
 | F0.11 | Shared lifecycle: shutdown coordinator, process handlers and entry point; composition root; `worker` and `publisher` process shells | Core |
 
@@ -182,7 +182,7 @@ covered by a test.
 | X4.4 | No credentials enter the sandbox: the repository is fetched outside it with the installation token and only source files are passed in | Core |
 | X4.5 | Base-versus-head execution: tests and `tsc --noEmit` on both commits, with results read from the test runner's JSON report | Core |
 | X4.6 | Semgrep in the sandbox image, with security rules and project rules for `@ts-ignore`, `eslint-disable`, empty `catch` blocks and `any` casts | Solid |
-| X4.7 | Snapshot in and results out through object storage (MinIO locally); results validated, and a missing or truncated result is recorded as inconclusive | Solid |
+| X4.7 | Snapshot in and results out through object storage (RustFS locally); results validated, and a missing or truncated result is recorded as inconclusive | Solid |
 | X4.8 | Containers removed on every path, plus a reaper for orphans left by crashes | Solid |
 | X4.9 | Malicious-repository suite: environment dump, outbound network call, fork bomb, memory exhaustion, writes outside the work directory, host file reads, output flood | Core |
 
@@ -435,3 +435,4 @@ not scope until swapped in under §9.
 | 2026-10-31 | Pre-start review: V1.1 adds issues: read (needed by A7.2); P2.8 also limits per API key; flow 4 (API keys) added; dependency install location aligned with ADR 0005 | Consistency fixes found in the final review; no hours added |
 | 2026-10-31 | Local models served by Ollama replace a hosted provider; hosted models are limited to the E8.7 comparison under a $10 cap | Cost |
 | 2026-10-31 | X4.3: dependencies are installed with lifecycle scripts disabled, and the analysis steps run with no network | Keeps the sandbox without network access on AWS (no NAT gateway) while still installing dependencies |
+| 2026-10-31 | F0.9, X4.7: RustFS replaces MinIO as the local S3-compatible store. No hours change | MinIO's repository is archived (last release October 2025); RustFS is Apache-2.0, maintained, and set up like MinIO. SeaweedFS is the fallback |

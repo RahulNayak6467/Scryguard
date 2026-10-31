@@ -4,7 +4,8 @@
 
 Current phase: 0 · Foundation (not started)
 Status: on track · cuts: C1 (swapped for API keys) · 0 / 10 h · Hosted $0 / $10
-Next: `/phase 0` (planning docs, ADRs, architecture and README are done).
+Next: P0.1 copy LLMux's committed foundation, rename, switch to Redis,
+`pnpm validate` green ([phases/phase-0.md](phases/phase-0.md)).
 Open questions: none.
 
 ## Phases
@@ -55,7 +56,7 @@ anything later slips.
 | 1 | Thinnest path: GitHub App, verified webhook, diff, one local-model call, Check Run | A PR on the test repo gets a Check Run within a minute |
 | 2 | Data model and API: installations, PRs, runs, idempotent intake, keyset lists, GitHub login, roles, API keys, rate limits, caching | Duplicate deliveries make one run; installation A never sees B's data; a revoked key stops working; list query uses an index (`EXPLAIN ANALYZE` on 100k rows) |
 | 3 | SQS + DLQ, idempotent consumer, visibility heartbeats, stale-SHA checks, outbox + publisher | 0 duplicate or stale results across 200 reviews with random worker kills |
-| 4 | Docker sandbox: base vs head test runs, `tsc`, Semgrep, limits, results via MinIO | Malicious-repo suite fully contained; base-vs-head shows a deleted test |
+| 4 | Docker sandbox: base vs head test runs, `tsc`, Semgrep, limits, results via RustFS (S3 locally) | Malicious-repo suite fully contained; base-vs-head shows a deleted test |
 | 5 | LangGraph graph: rule-based router, test-integrity and guardrail-bypass specialists, basic adjudicator, step journal | v1 catches seeded test weakening and suppressed checks with evidence |
 | 6 | tree-sitter symbol table and chunks, pgvector + full-text, rank fusion, per-commit index | Right function in the top 5 for a 20-pair test set |
 | 7 | Hallucination + dependency and intent + completeness specialists, full adjudicator, injection defenses | All four specialists run; injection fixture contained |
@@ -183,7 +184,8 @@ per phase:
      docs/private`.
   4. Check: `git log --stat` shows no private path; `grep -rniE
      "claude|docs/private|/learn|/wrap"` finds nothing private; commit
-     messages read well in public.
+     messages read well in public; a full-history `gitleaks git . --config
+     .gitleaks.toml --redact` finds nothing.
   5. Add a LICENSE, then push to a **new** public GitHub repo.
   6. To update it later, repeat steps 2–5 from a fresh clone.
 
