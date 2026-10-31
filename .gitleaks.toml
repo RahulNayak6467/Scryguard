@@ -1,0 +1,14 @@
+title = "scryguard"
+
+[extend]
+useDefault = true
+
+# Keys are scg_ + 32 random bytes in base64url: exactly 43 characters, and the
+# last one carries only 4 bits, so it can only be one of 16 characters.
+[[rules]]
+id = "scryguard-api-key"
+description = "Scryguard API key"
+regex = '''(?:^|[^A-Za-z0-9_-])(scg_[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048])(?:[^A-Za-z0-9_-]|$)'''
+secretGroup = 1
+entropy = 4.0
+keywords = ["scg_"]

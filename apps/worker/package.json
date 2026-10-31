@@ -1,0 +1,21 @@
+{
+  "name": "@scryguard/worker",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Scryguard worker process: consumes review jobs (a shell for now)",
+  "type": "module",
+  "scripts": {
+    "dev": "node --env-file-if-exists=../../.env --conditions=@scryguard/source --watch --import tsx src/main.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "clean": "node --eval \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
+    "start": "node --enable-source-maps dist/main.js",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run --root ../.. --passWithNoTests apps/worker/"
+  },
+  "dependencies": {
+    "@scryguard/config": "workspace:*",
+    "@scryguard/logger": "workspace:*",
+    "@scryguard/shared": "workspace:*",
+    "zod": "catalog:"
+  }
+}

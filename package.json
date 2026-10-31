@@ -1,0 +1,53 @@
+{
+  "name": "scryguard",
+  "version": "0.0.0",
+  "private": true,
+  "description": "A trust gate for pull requests written by AI coding agents",
+  "type": "module",
+  "packageManager": "pnpm@12.16.1",
+  "engines": {
+    "node": ">=24.22.2 <25",
+    "pnpm": "12.16.1"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @scryguard/api dev",
+    "build": "pnpm -r run build",
+    "clean": "pnpm -r run clean",
+    "typecheck": "pnpm -r run typecheck",
+    "lint": "eslint . --max-warnings 0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:unit": "vitest run --project unit",
+    "test:integration": "vitest run --project integration",
+    "test:watch": "vitest --project unit",
+    "db:migrate": "pnpm --filter @scryguard/database migrate:up",
+    "db:migrate:create": "pnpm --filter @scryguard/database migrate:create",
+    "db:migrate:test": "pnpm --filter @scryguard/database migrate:test:up",
+    "openapi:generate": "pnpm --filter @scryguard/api openapi:generate",
+    "openapi:check": "pnpm openapi:generate && { git diff --exit-code -- apps/api/openapi.json && git ls-files --error-unmatch apps/api/openapi.json > /dev/null 2>&1 || { echo 'apps/api/openapi.json is stale or untracked: run pnpm openapi:generate and commit it' >&2; exit 1; }; }",
+    "test:stack": "docker compose -f docker-compose.test.yml --env-file .env.test up -d --wait && pnpm db:migrate:test",
+    "validate": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm openapi:check && pnpm test && pnpm build",
+    "prepare": "simple-git-hooks"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "if [ -x .git/local-pre-commit ]; then .git/local-pre-commit || exit 1; fi; pnpm exec lint-staged"
+  },
+  "lint-staged": {
+    "*": "prettier --write --ignore-unknown",
+    "*.{ts,js}": "eslint --max-warnings 0"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "24.19.2",
+    "eslint": "10.14.0",
+    "lint-staged": "17.6.0",
+    "prettier": "3.9.10",
+    "simple-git-hooks": "2.14.0",
+    "tsx": "4.23.15",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.72.1",
+    "vite": "8.3.5",
+    "vitest": "5.0.5"
+  }
+}

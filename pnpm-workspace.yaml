@@ -1,0 +1,15 @@
+packages:
+  - 'apps/*'
+  - 'packages/*'
+
+saveExact: true
+
+catalog:
+  zod: 4.6.7
+
+allowBuilds:
+  esbuild: false
+  simple-git-hooks: false
+
+minimumReleaseAgeExclude:
+  - eslint@10.14.0

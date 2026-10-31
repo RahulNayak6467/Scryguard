@@ -1,0 +1,193 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  # labeled/unlabeled: adding the breaking-api-change label re-runs the contract check.
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# On a PR a newer push cancels the older run; on main every commit is verified.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  secrets:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+
+    steps:
+      - name: Check out repository with full history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      # No GITLEAKS_VERSION: the action's own pinned version moves with Dependabot updates.
+      - name: Scan commits for secrets
+        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: .gitleaks.toml
+          GITLEAKS_ENABLE_COMMENTS: false
+
+  # PRs only: the breaking-api-change label lives on the PR.
+  api-contract:
+    name: API breaking-change check (oasdiff)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+
+    steps:
+      - name: Check out repository with full history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Find the document to compare against
+        id: base
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ -z "$BASE_SHA" ] || ! git cat-file -e "$BASE_SHA:apps/api/openapi.json" 2>/dev/null; then
+            echo "No earlier OpenAPI document to compare against; skipping."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git show "$BASE_SHA:apps/api/openapi.json" > base-openapi.json
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+
+      # Fails on breaking changes unless the PR carries the breaking-api-change label.
+      - name: Check for breaking changes
+        if: steps.base.outputs.skip == 'false'
+        uses: oasdiff/oasdiff-action/breaking@9e56cf8b3aff7edb326d5767d3d23f96127e20c3 # v0.1.21
+        with:
+          base: base-openapi.json
+          revision: apps/api/openapi.json
+          fail-on: ${{ !contains(github.event.pull_request.labels.*.name, 'breaking-api-change') && 'ERR' || '' }}
+          review: false
+
+  quality:
+    name: Format, lint, typecheck, unit tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install pinned pnpm and Node.js
+        uses: pnpm/setup@fa36a5ef7dcdefc3a7cb25655c122e00cf6e636e # v3.1.2
+        with:
+          version: 12.16.1
+          runtime: node@24.22.2
+          cache: true
+          install: false
+
+      # Versions must match package.json (packageManager, engines) and .nvmrc.
+      - name: Verify toolchain versions
+        shell: bash
+        run: |
+          test "$(node --version)" = "v$(cat .nvmrc)"
+          test "$(pnpm --version)" = "12.16.1"
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Create test environment file
+        run: cp .env.test.example .env.test
+
+      - name: Check formatting
+        run: pnpm format:check
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      # A stale committed spec means a contract change skipped review.
+      - name: Check OpenAPI spec is up to date
+        run: pnpm openapi:check
+
+      - name: Run unit tests
+        run: pnpm test:unit
+
+      - name: Audit production dependencies
+        run: pnpm audit --prod --audit-level=high
+
+  integration:
+    name: Integration tests and build
+    needs: quality
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install pinned pnpm and Node.js
+        uses: pnpm/setup@fa36a5ef7dcdefc3a7cb25655c122e00cf6e636e # v3.1.2
+        with:
+          version: 12.16.1
+          runtime: node@24.22.2
+          cache: true
+          install: false
+
+      - name: Verify toolchain versions
+        shell: bash
+        run: |
+          test "$(node --version)" = "v$(cat .nvmrc)"
+          test "$(pnpm --version)" = "12.16.1"
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Create test environment file
+        run: cp .env.test.example .env.test
+
+      - name: Start test stack
+        id: test-stack
+        run: docker compose -f docker-compose.test.yml --env-file .env.test up -d --wait
+
+      - name: Run test migrations
+        run: pnpm db:migrate:test
+
+      - name: Run integration tests
+        run: pnpm test:integration
+
+      - name: Build
+        run: pnpm build
+
+      - name: Smoke-test built apps
+        shell: bash
+        run: |
+          set -euo pipefail
+          set -a; source .env.test; set +a
+          export NODE_ENV=production LOG_LEVEL=info PORT=8099 SHUTDOWN_TIMEOUT_MS=20000
+          export DATABASE_URL="$TEST_DATABASE_URL" REDIS_URL="$TEST_REDIS_URL"
+          for app in api worker publisher; do
+            node "apps/$app/dist/main" > "/tmp/smoke-$app.log" 2>&1 &
+            pid=$!
+            sleep 3
+            kill -0 "$pid" || { cat "/tmp/smoke-$app.log"; exit 1; }
+            if [ "$app" = api ]; then curl -fsS "http://127.0.0.1:$PORT/health/live"; echo; fi
+            kill -TERM "$pid"
+            wait "$pid" || { cat "/tmp/smoke-$app.log"; exit 1; }
+          done
+
+      # An earlier failure leaves no stack and no .env.test, so this step would fail too.
+      - name: Show test stack logs on failure
+        if: failure() && steps.test-stack.outcome != 'skipped'
+        run: docker compose -f docker-compose.test.yml --env-file .env.test logs --no-color
