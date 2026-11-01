@@ -2,6 +2,7 @@ node_modules/
 .pnpm-store/
 dist/
 coverage/
+.next/
 *.tsbuildinfo
 .eslintcache
 *.log
@@ -33,3 +34,5 @@ crash.log
 docker-compose.override.yml
 
 evals/.cache/
+tools/python/.venv/
+__pycache__/
