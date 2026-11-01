@@ -2,10 +2,15 @@
 
 ## Now
 
-Current phase: 0 · Foundation (not started)
-Status: on track · cuts: C1 (swapped for API keys) · 0 / 10 h · Hosted $0 / $10
-Next: P0.1 copy LLMux's committed foundation, rename, switch to Redis,
-`pnpm validate` green ([phases/phase-0.md](phases/phase-0.md)).
+Current phase: 0 · Foundation (in progress)
+Status: on track · cuts: C1 (swapped for API keys) · 6 / 10 h · Hosted $0 / $10
+Done: config, stack, CI; packages `shared` (errors, clock), `logger`,
+`config`, `database`, `redis` with tests (255 unit + integration green).
+Next: P0.7 shutdown coordinator in `shared` from a blank file, then the
+apps (`api`, `worker`, `publisher`), P0.2 gitleaks test, P0.6 ADR 0009,
+P0.8, P0.9 ([phases/phase-0.md](phases/phase-0.md)).
+Risk: ~7 h of planned work left against 4 h of budget; theory (2 h) not
+started. 1.5× rule applies at 15 h.
 Open questions: none.
 
 ## Phases
@@ -19,7 +24,7 @@ April, summer May 1–mid-July (15-day trip inside it).
 
 | # | Phase | T | B | Plan | Cum | Deadline | T act | B act | Status |
 |---|---|---:|---:|---:|---:|---|---:|---:|---|
-| 0 | Foundation | 2 | 8 | 10 | 10 | Nov 5 | | | |
+| 0 | Foundation | 2 | 8 | 10 | 10 | Nov 5 | 0 | 6 | in progress |
 | 1 | Vertical slice | 6 | 24 | 30 | 40 | Dec 2 | | | |
 | 2 | Control plane | 14 | 48 | 62 | 102 | Dec 14 | | | |
 | 3 | Reliable processing | 12 | 48 | 60 | 162 | Dec 29 | | | |
@@ -218,3 +223,7 @@ Open important findings from `/review` (removed when fixed).
   drill, runbooks and a public demo repository (+11 h → 503 h); stretch
   S6–S8 added; details added to several IDs without hours (scope change
   log)
+- 2026-11-02 · T 0 · B 6 · Oct 31–Nov 2: root and workspace config, local
+  stack (RustFS for MinIO), CI; packages shared, logger, config, database,
+  redis with unit and integration tests; F0.5 redaction and error kinds
+  narrowed to phase 0 (logger redaction handed over); notes ×2 · Hosted $0

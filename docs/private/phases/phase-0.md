@@ -54,14 +54,19 @@ commits of each push or PR, not full history. Run a full-history scan by
 hand (`gitleaks git . --config .gitleaks.toml --redact`) after any change to
 `.gitleaks.toml` and before going public (plan.md, Going public step 4).
 
-**P0.5 Redaction.**
-- Pino redacts by *path* (a field name). The App private key can arrive
-  inside an error message string. Is a path list enough, and if not, what
-  is the cheapest safe default?
-- Which repository-content fields exist from phase 1 (diff, patch, file
-  content, PR body)? Redact them by default, or log only their size?
-- Done when: a test logs an object holding a fake PEM key, a `ghs_` token,
-  a webhook secret and a diff, and the output contains none of them.
+**P0.5 Redaction (narrowed 2026-11-01).** Phase 0 builds only the generic
+base: the secrets that exist now. Each later phase adds the redaction for
+the secrets it introduces, in the same step as the code that first holds
+them (design-notes, phase 1).
+- Covers: passwords, connection URLs (`DATABASE_URL` and `REDIS_URL` carry
+  passwords), auth and cookie headers, request and response bodies.
+- Stays generic: no GitHub or repository names in `logger`; apps add their
+  own paths when they need them.
+- Done when: a test logs an object holding a fake connection URL with a
+  password, an `authorization` header and a request body, and the output
+  contains none of them.
+- Handed over: generic redaction (2026-11-01), revisit. Written by Claude
+  at the user's request; the phase 1 string scrub stays learn mode.
 
 **P0.6 Errors.**
 - `quota_exceeded` was LLMux budgets. Drop it, or map Scryguard's future
@@ -123,8 +128,11 @@ All arrive with the copy; P0.6 confirms the set. The readiness 503 is
 | `payload_too_large` | `PAYLOAD_TOO_LARGE` | 413 | no |
 | `internal` | `INTERNAL_ERROR` | 500 | no |
 
-Kinds kept with no code yet: `unauthenticated` (401), `conflict` (409),
-`rate_limited` (429, retryable), `unavailable` (503, retryable).
+Only the four kinds above exist in phase 0 (decided 2026-11-01). Each
+later kind arrives with the phase that first returns it, with a test:
+`unauthenticated` (401) and `conflict` (409) in phase 2, `rate_limited`
+(429, retryable) in P2.8, `unavailable` (503, retryable) when the first
+503 envelope appears.
 
 ## 8. Invariants
 
@@ -149,7 +157,7 @@ Kinds kept with no code yet: `unauthenticated` (401), `conflict` (409),
 | Coordinator: two triggers | Remove the "already running" guard → steps run twice |
 | Coordinator: a step throws | Stop on first error → the pool never closes |
 | Coordinator: deadline | Remove the deadline timer → a hung step hangs forever |
-| Redaction: fake PEM, `ghs_`, diff | Drop one path → secret appears in output |
+| Redaction: connection URL, `authorization` header, request body | Drop one path → secret appears in output |
 | Error middleware: DB error | Pass `error.message` through → SQL reaches the client |
 | Kind table | Add a kind without a status → typecheck fails |
 | gitleaks: fake `ghp_`, `ghs_`, `github_pat_`, PEM | Disable a rule → that secret passes the scan |

@@ -156,6 +156,14 @@ Fields per phase: intent · decided · races and failure cases · break first
   the model is chosen by measurement (tool calling and JSON-schema
   reliability on 8 GB of VRAM), not by reputation. A fake model server and
   a fake GitHub API are built here, so no test ever calls a real service.
+  Redaction for GitHub secrets ships in the same step as the first code
+  that holds them (decided 2026-11-01, phase 0 built only the generic
+  base): the App private key, installation tokens and the webhook secret
+  by path, plus a scrub for secret shapes (PEM blocks, `ghs_`/`ghp_`/
+  `github_pat_`) inside error message strings, since a path list cannot
+  see a key inside a string. Repository content (diff, patch, PR body)
+  is redacted by the worker's own paths. Test: a fake PEM, a `ghs_`
+  token, a webhook secret and a diff never reach a log line.
 - **Races and failure cases.** Tampered or missing signature; GitHub API
   error while reporting; model server down or returning invalid JSON.
 - **Break first.** Send a webhook with a tampered body to a handler without

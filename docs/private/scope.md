@@ -99,7 +99,7 @@ who accept pull requests from AI coding agents.
 | F0.2 | Configuration validated once at startup with Zod; the process refuses to start on invalid configuration | Glue |
 | F0.3 | One PostgreSQL pool per process; plain SQL migrations with `node-pg-migrate` | Glue |
 | F0.4 | Redis client with fail-fast settings, injected from the composition root | Glue |
-| F0.5 | Structured logging with request and run IDs; redaction of tokens, keys, the App private key and repository contents | Solid |
+| F0.5 | Structured logging with request and run IDs; generic redaction of the secrets phase 0 holds (passwords, connection URLs, auth and cookie headers, bodies). GitHub secrets and repository contents are redacted in phase 1, with the code that first holds them (V1.2, V1.3, V1.4) | Solid |
 | F0.6 | Liveness and readiness endpoints; graceful shutdown (stop accepting, drain, close pools) | Core |
 | F0.7 | One error envelope with stable codes; internal details never reach clients | Solid |
 | F0.8 | CI (lint, typecheck, tests, build, OpenAPI breaking-change check); gitleaks with rules for GitHub tokens and private keys; Dependabot; pre-commit hooks (lint-staged, plus the local commit-split check) | Glue |
@@ -436,3 +436,4 @@ not scope until swapped in under §9.
 | 2026-10-31 | Local models served by Ollama replace a hosted provider; hosted models are limited to the E8.7 comparison under a $10 cap | Cost |
 | 2026-10-31 | X4.3: dependencies are installed with lifecycle scripts disabled, and the analysis steps run with no network | Keeps the sandbox without network access on AWS (no NAT gateway) while still installing dependencies |
 | 2026-10-31 | F0.9, X4.7: RustFS replaces MinIO as the local S3-compatible store. No hours change | MinIO's repository is archived (last release October 2025); RustFS is Apache-2.0, maintained, and set up like MinIO. SeaweedFS is the fallback |
+| 2026-11-01 | F0.5 narrowed: phase 0 redacts only the secrets it holds; GitHub secret and repository-content redaction (including a scrub for secret shapes inside error messages) moves into phase 1 with V1.2–V1.4. Error kinds likewise arrive with the phase that first returns them. No hours change | No GitHub code exists in phase 0, so those rules would protect nothing and guess at field names |
