@@ -3,15 +3,15 @@
 ## Now
 
 Current phase: 0 · Foundation (in progress)
-Status: on track · cuts: C1 (swapped for API keys) · 6 / 10 h · Hosted $0 / $10
-Done: config, stack, CI; packages `shared` (errors, clock), `logger`,
-`config`, `database`, `redis` with tests (255 unit + integration green).
-Next: P0.7 shutdown coordinator in `shared` from a blank file, then the
-apps (`api`, `worker`, `publisher`), P0.2 gitleaks test, P0.6 ADR 0009,
+Status: on track · cuts: C1 (swapped for API keys) · 8 / 10 h · Hosted $0 / $10
+Done: stack, CI, all five packages; api middleware, config (3 apps),
+`app.ts`, health + readiness, OpenAPI; P0.2 gitleaks test; ADR 0009
+drafted (Proposed). 430 unit + 25 integration green.
+Next: theory (T 2: event loop, signals, drill-0), then P0.7 shutdown
+coordinator from a blank file → `main.ts` ×3, P0.4 shells + smoke,
 P0.8, P0.9 ([phases/phase-0.md](phases/phase-0.md)).
-Risk: ~7 h of planned work left against 4 h of budget; theory (2 h) not
-started. 1.5× rule applies at 15 h.
-Open questions: none.
+Risk: ~6 h left (T 2, B ~4) → ~14 h total, under the 15 h 1.5× line.
+Open questions: accept ADR 0009 (keep the OpenAPI line?).
 
 ## Phases
 
@@ -24,7 +24,7 @@ April, summer May 1–mid-July (15-day trip inside it).
 
 | # | Phase | T | B | Plan | Cum | Deadline | T act | B act | Status |
 |---|---|---:|---:|---:|---:|---|---:|---:|---|
-| 0 | Foundation | 2 | 8 | 10 | 10 | Nov 5 | 0 | 6 | in progress |
+| 0 | Foundation | 2 | 8 | 10 | 10 | Nov 5 | 0 | 8 | in progress |
 | 1 | Vertical slice | 6 | 24 | 30 | 40 | Dec 2 | | | |
 | 2 | Control plane | 14 | 48 | 62 | 102 | Dec 14 | | | |
 | 3 | Reliable processing | 12 | 48 | 60 | 162 | Dec 29 | | | |
@@ -227,3 +227,7 @@ Open important findings from `/review` (removed when fixed).
   stack (RustFS for MinIO), CI; packages shared, logger, config, database,
   redis with unit and integration tests; F0.5 redaction and error kinds
   narrowed to phase 0 (logger redaction handed over); notes ×2 · Hosted $0
+- 2026-11-02 · T 0 · B 2 · api middleware (user) with 76 tests; per-app
+  config, `app.ts`, health + readiness, OpenAPI generation (shipped);
+  P0.2 gitleaks rule test via pinned Docker image; ADR 0009 drafted ·
+  Hosted $0
