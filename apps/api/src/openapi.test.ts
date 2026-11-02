@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import * as z from 'zod';
 
 import { silentLogger } from '../test/support/capture-logs.js';
-import { createApp } from './app.js';
+import { createApp } from './http/app.js';
 import {
   liveResponseSchema,
   notReadyResponseSchema,

@@ -7,7 +7,7 @@ import request from 'supertest';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { silentLogger } from '../test/support/capture-logs.js';
-import { createApp, MAX_REQUEST_BODY_BYTES } from './app.js';
+import { createApp, MAX_REQUEST_BODY_BYTES } from './http/app.js';
 import type { ReadinessChecker } from './health/readiness.js';
 import { REQUEST_ID_HEADER } from './http/request-id.middleware.js';
 

@@ -2,12 +2,12 @@ import type { Logger } from '@scryguard/logger';
 import type { Clock } from '@scryguard/shared';
 import express, { type Express } from 'express';
 
-import { createHealthRoutes } from './health/health.routes.js';
-import type { ReadinessChecker } from './health/readiness.js';
-import { createErrorMiddleware } from './http/error.middleware.js';
-import { createBodyLimitMiddleware, notFoundMiddleware } from './http/helper-error.middleware.js';
-import { createRequestIdMiddleware } from './http/request-id.middleware.js';
-import { createRequestLoggerMiddleware } from './http/request-logger.middleware.js';
+import { createHealthRoutes } from '../health/health.routes.js';
+import type { ReadinessChecker } from '../health/readiness.js';
+import { createErrorMiddleware } from './error.middleware.js';
+import { createBodyLimitMiddleware, notFoundMiddleware } from './helper-error.middleware.js';
+import { createRequestIdMiddleware } from './request-id.middleware.js';
+import { createRequestLoggerMiddleware } from './request-logger.middleware.js';
 
 export const MAX_REQUEST_BODY_BYTES = 1_048_576;
 
