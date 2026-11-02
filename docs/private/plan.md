@@ -3,14 +3,14 @@
 ## Now
 
 Current phase: 0 · Foundation (in progress)
-Status: on track · cuts: C1 (swapped for API keys) · 8 / 10 h · Hosted $0 / $10
-Done: stack, CI, all five packages; api middleware, config (3 apps),
-`app.ts`, health + readiness, OpenAPI; P0.2 gitleaks test; ADR 0009
-drafted (Proposed). 430 unit + 25 integration green.
-Next: theory (T 2: event loop, signals, drill-0), then P0.7 shutdown
-coordinator from a blank file → `main.ts` ×3, P0.4 shells + smoke,
-P0.8, P0.9 ([phases/phase-0.md](phases/phase-0.md)).
-Risk: ~6 h left (T 2, B ~4) → ~14 h total, under the 15 h 1.5× line.
+Status: behind 4 h · cuts: C1 (swapped for API keys) · 14 / 10 h · Hosted $0 / $10
+Done: theory; P0.7 coordinator (`shared/shutdown`, module-level state)
+with 15 unit + 11 process tests; `main.ts` ×3; P0.4 shells; CI smoke
+passes locally. 445 unit + 36 integration green.
+Next: shutdown factory `createShutdown({ logger, steps, timeoutMs })`,
+then P0.8 experiments, P0.9 exit ([phases/phase-0.md](phases/phase-0.md)).
+Risk: ~1.5 h left → ~15.5 h, past the 15 h 1.5× line: no more polish;
+factory, P0.8 and P0.9 only.
 Open questions: accept ADR 0009 (keep the OpenAPI line?).
 
 ## Phases
@@ -24,7 +24,7 @@ April, summer May 1–mid-July (15-day trip inside it).
 
 | # | Phase | T | B | Plan | Cum | Deadline | T act | B act | Status |
 |---|---|---:|---:|---:|---:|---|---:|---:|---|
-| 0 | Foundation | 2 | 8 | 10 | 10 | Nov 5 | 0 | 8 | in progress |
+| 0 | Foundation | 2 | 8 | 10 | 10 | Nov 5 | 2 | 12 | in progress |
 | 1 | Vertical slice | 6 | 24 | 30 | 40 | Dec 2 | | | |
 | 2 | Control plane | 14 | 48 | 62 | 102 | Dec 14 | | | |
 | 3 | Reliable processing | 12 | 48 | 60 | 162 | Dec 29 | | | |
@@ -231,3 +231,8 @@ Open important findings from `/review` (removed when fixed).
   config, `app.ts`, health + readiness, OpenAPI generation (shipped);
   P0.2 gitleaks rule test via pinned Docker image; ADR 0009 drafted ·
   Hosted $0
+- 2026-11-03 · T 2 · B 4 · theory (event loop, signals, drill-0); P0.7
+  shutdown (user) one file → `shared/shutdown` + `main.ts`, 11 process
+  tests + 15 unit tests (shipped); worker/publisher shells; CI smoke green
+  locally; drain delay deferred to phase 10; gitleaks test found ignored
+  by `.gitignore` `secrets/` → rename folder · Hosted $0

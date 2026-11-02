@@ -350,6 +350,12 @@ Fields per phase: intent · decided · races and failure cases · break first
 - **Open design questions.** Which VPC endpoints are strictly required?
   What is the least-privilege policy for the EC2 role and the worker's
   `RunTask` permissions? What is the destroy-and-recreate routine?
+  Does Caddy in front of the API need a drain delay (readiness 503 →
+  wait → `server.close()`)? If so, add `DRAIN_DELAY_MS` and require
+  shutdown > drain + statement timeout + `SHUTDOWN_MARGIN_MS`; raise
+  `SHUTDOWN_TIMEOUT_MS` and the container `stop_grace_period` to fit.
+  Deferred from P0.7 (2026-11-02): no load balancer locally, so the
+  delay would always be 0.
 - **Resist.** Multi-AZ, autoscaling, an ALB.
 - **Interview story.** How the sandbox is isolated on AWS, layer by layer.
 - **Learned.**
