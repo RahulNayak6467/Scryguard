@@ -13,7 +13,7 @@
     "dev": "pnpm --filter @scryguard/api dev",
     "build": "pnpm -r run build",
     "clean": "pnpm -r run clean",
-    "typecheck": "pnpm -r run typecheck",
+    "typecheck": "pnpm -r run typecheck && tsc --noEmit -p tests/tsconfig.json",
     "lint": "eslint . --max-warnings 0",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -48,6 +48,7 @@
     "typescript": "6.0.3",
     "typescript-eslint": "8.72.1",
     "vite": "8.3.5",
-    "vitest": "5.0.5"
+    "vitest": "5.0.5",
+    "zod": "catalog:"
   }
 }

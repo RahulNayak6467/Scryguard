@@ -57,7 +57,7 @@ export default defineConfig({
         test: {
           // One file at a time: they share one test database.
           name: 'integration',
-          include: ['{apps,packages}/*/test/integration/**/*.test.ts'],
+          include: ['{apps,packages}/*/test/integration/**/*.test.ts', 'tests/**/*.test.ts'],
           fileParallelism: false,
           hookTimeout: 30_000,
           testTimeout: 30_000,
