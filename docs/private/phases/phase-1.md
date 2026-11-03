@@ -62,6 +62,12 @@ the checkpoint (cumulative actual ÷ plan > 1.10 → C2) is hit unless phase
 
 Each task notes its estimate and 1.5× stop line before it starts.
 
+**P1.0 Phase 0 review.** Handed over: config shutdown rule cleanup
+(2026-11-03), revisit. The user designed it (HTTP drain share, the
+`MIN_HTTP_DRAIN_MS` floor, statement timeout 15 → 5 s); Claude wrote
+`httpDrainMsOf`, the rule and message in `apps/api/src/config.ts` and the
+`.env.example` lines at the user's request, for lack of time.
+
 **P1.1 App and setup.**
 - Which permission would you drop if GitHub showed it was unused, and how would you notice?
 - Tunnel for real deliveries (smee or cloudflared): a dev tool only, never shipped. Which, and does it count as a new dependency?

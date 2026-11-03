@@ -23,13 +23,14 @@ const expectedDefaults = {
     headersTimeoutMs: 20_000,
     keepAliveTimeoutMs: 5_000,
     shutdownTimeoutMs: 20_000,
+    httpDrainMs: 6_000,
   },
   database: {
     url: databaseUrl,
     poolMax: 10,
     connectionTimeoutMs: 5_000,
     idleTimeoutMs: 10_000,
-    statementTimeoutMs: 15_000,
+    statementTimeoutMs: 5_000,
     readinessTimeoutMs: 1_000,
   },
   redis: { url: redisUrl, commandTimeoutMs: 100, connectTimeoutMs: 2_000 },
@@ -41,6 +42,7 @@ const explicitInput = {
   LOG_LEVEL: 'debug',
   LOG_PRETTY: 'true',
   PORT: '8080',
+  MIN_HTTP_DRAIN_MS: '8000',
   HTTP_REQUEST_TIMEOUT_MS: '90000',
   HTTP_HEADERS_TIMEOUT_MS: '45000',
   HTTP_KEEP_ALIVE_TIMEOUT_MS: '7000',
@@ -48,7 +50,7 @@ const explicitInput = {
   DB_POOL_MAX: '20',
   DB_CONNECTION_TIMEOUT_MS: '2000',
   DB_POOL_IDLE_TIMEOUT_MS: '30000',
-  DB_STATEMENT_TIMEOUT_MS: '45000',
+  DB_STATEMENT_TIMEOUT_MS: '30000',
   DB_READINESS_TIMEOUT_MS: '750',
   REDIS_COMMAND_TIMEOUT_MS: '250',
   REDIS_CONNECT_TIMEOUT_MS: '4000',
@@ -63,13 +65,14 @@ const expectedExplicit = {
     headersTimeoutMs: 45_000,
     keepAliveTimeoutMs: 7_000,
     shutdownTimeoutMs: 50_000,
+    httpDrainMs: 14_000,
   },
   database: {
     url: databaseUrl,
     poolMax: 20,
     connectionTimeoutMs: 2_000,
     idleTimeoutMs: 30_000,
-    statementTimeoutMs: 45_000,
+    statementTimeoutMs: 30_000,
     readinessTimeoutMs: 750,
   },
   redis: { url: redisUrl, commandTimeoutMs: 250, connectTimeoutMs: 4_000 },
@@ -120,7 +123,7 @@ describe('API configuration', () => {
       { field: 'HTTP_REQUEST_TIMEOUT_MS', min: 1_000, max: 300_000 },
       { field: 'HTTP_HEADERS_TIMEOUT_MS', min: 1_000, max: 120_000 },
       { field: 'HTTP_KEEP_ALIVE_TIMEOUT_MS', min: 1_000, max: 60_000 },
-      { field: 'SHUTDOWN_TIMEOUT_MS', min: 5_000, max: 120_000 },
+      { field: 'MIN_HTTP_DRAIN_MS', min: 1_000, max: 10_000 },
     ] as const;
 
     // Small database timeouts and a large request timeout keep the cross-field rules quiet.
@@ -129,8 +132,10 @@ describe('API configuration', () => {
       HTTP_HEADERS_TIMEOUT_MS: '1000',
       HTTP_KEEP_ALIVE_TIMEOUT_MS: '1000',
       SHUTDOWN_TIMEOUT_MS: '120000',
+      DB_CONNECTION_TIMEOUT_MS: '100',
       DB_STATEMENT_TIMEOUT_MS: '100',
       DB_READINESS_TIMEOUT_MS: '100',
+      MIN_HTTP_DRAIN_MS: '1000',
     };
 
     it.each(timeouts)('accepts both boundaries of $field', ({ field, min, max }) => {
@@ -141,6 +146,36 @@ describe('API configuration', () => {
     it.each(timeouts)('rejects one past each boundary of $field', ({ field, min, max }) => {
       expect(failingFields({ ...quiet, [field]: String(min - 1) })).toContain(field);
       expect(failingFields({ ...quiet, [field]: String(max + 1) })).toContain(field);
+    });
+
+    it('accepts the SHUTDOWN_TIMEOUT_MS maximum and rejects one above it', () => {
+      expect(failingFields({ ...quiet, SHUTDOWN_TIMEOUT_MS: '120000' })).toEqual([]);
+      expect(failingFields({ ...quiet, SHUTDOWN_TIMEOUT_MS: '120001' })).toContain(
+        'SHUTDOWN_TIMEOUT_MS',
+      );
+    });
+
+    it('rejects SHUTDOWN_TIMEOUT_MS one below its 5000 minimum', () => {
+      expect(failingFields({ ...quiet, SHUTDOWN_TIMEOUT_MS: '4999' })).toContain(
+        'SHUTDOWN_TIMEOUT_MS',
+      );
+    });
+
+    it('rejects the 5000 SHUTDOWN_TIMEOUT_MS minimum through the drain rule even with the smallest other timeouts', () => {
+      expect(issuesFor({ ...quiet, SHUTDOWN_TIMEOUT_MS: '5000' })).toEqual([
+        expect.objectContaining({
+          path: ['SHUTDOWN_TIMEOUT_MS'],
+          message:
+            'Shutdown timeout must be at least MIN_HTTP_DRAIN_MS + DB_CONNECTION_TIMEOUT_MS + DB_STATEMENT_TIMEOUT_MS + 4000 ms',
+        }),
+      ]);
+    });
+
+    it('accepts 5200 as the smallest SHUTDOWN_TIMEOUT_MS the drain rule allows', () => {
+      expect(failingFields({ ...quiet, SHUTDOWN_TIMEOUT_MS: '5200' })).toEqual([]);
+      expect(failingFields({ ...quiet, SHUTDOWN_TIMEOUT_MS: '5199' })).toEqual([
+        'SHUTDOWN_TIMEOUT_MS',
+      ]);
     });
 
     it('rejects a timeout past the Node timer limit instead of letting it fire after 1 ms', () => {
@@ -199,32 +234,85 @@ describe('API configuration', () => {
       expect(SHUTDOWN_MARGIN_MS).toBe(QUERY_TIMEOUT_MARGIN_MS + QUIT_TIMEOUT_MS);
     });
 
-    it.each([
-      ['equal to statement + margin', String(15_000 + SHUTDOWN_MARGIN_MS), false],
-      ['one above statement + margin', String(15_000 + SHUTDOWN_MARGIN_MS + 1), true],
-    ])('shutdown timeout %s → valid=%s', (_label, shutdown, valid) => {
-      expect(
-        failingFields({ DB_STATEMENT_TIMEOUT_MS: '15000', SHUTDOWN_TIMEOUT_MS: shutdown }),
-      ).toEqual(valid ? [] : ['SHUTDOWN_TIMEOUT_MS']);
+    it('uses a 4000 ms shutdown margin', () => {
+      expect(SHUTDOWN_MARGIN_MS).toBe(4_000);
     });
 
-    it('names the margin in the shutdown rule message', () => {
-      expect(issuesFor({ DB_STATEMENT_TIMEOUT_MS: '45000', SHUTDOWN_TIMEOUT_MS: '10000' })).toEqual(
-        [
+    describe('HTTP drain share', () => {
+      const drainInput = {
+        MIN_HTTP_DRAIN_MS: '3000',
+        DB_CONNECTION_TIMEOUT_MS: '1000',
+        DB_STATEMENT_TIMEOUT_MS: '2000',
+      };
+
+      it.each([
+        ['10001', true],
+        ['10000', true],
+        ['9999', false],
+      ])(
+        'shutdown timeout %s against a 3000 minimum drain, 1000 connection and 2000 statement timeout → valid=%s',
+        (shutdown, valid) => {
+          expect(failingFields({ ...drainInput, SHUTDOWN_TIMEOUT_MS: shutdown })).toEqual(
+            valid ? [] : ['SHUTDOWN_TIMEOUT_MS'],
+          );
+        },
+      );
+
+      it.each([
+        ['MIN_HTTP_DRAIN_MS', '3001'],
+        ['DB_CONNECTION_TIMEOUT_MS', '1001'],
+        ['DB_STATEMENT_TIMEOUT_MS', '2001'],
+      ])('rejects a 10000 shutdown timeout once %s grows by 1 ms to %s', (field, value) => {
+        expect(
+          failingFields({ ...drainInput, SHUTDOWN_TIMEOUT_MS: '10000', [field]: value }),
+        ).toEqual(['SHUTDOWN_TIMEOUT_MS']);
+      });
+
+      it.each([
+        ['10000', 3_000],
+        ['10001', 3_001],
+        ['25000', 18_000],
+      ])('computes httpDrainMs for a %s shutdown timeout as %i', (shutdown, httpDrainMs) => {
+        expect(
+          parseConfig({ ...requiredInput, ...drainInput, SHUTDOWN_TIMEOUT_MS: shutdown }).server
+            .httpDrainMs,
+        ).toBe(httpDrainMs);
+      });
+
+      it('subtracts the connection timeout, the statement timeout and the margin from the shutdown timeout', () => {
+        const config = parseConfig({
+          ...requiredInput,
+          MIN_HTTP_DRAIN_MS: '1000',
+          SHUTDOWN_TIMEOUT_MS: '40000',
+          DB_CONNECTION_TIMEOUT_MS: '7000',
+          DB_STATEMENT_TIMEOUT_MS: '11000',
+        });
+
+        expect(config.server.httpDrainMs).toBe(40_000 - 7_000 - 11_000 - SHUTDOWN_MARGIN_MS);
+        expect(config.server.httpDrainMs).toBe(18_000);
+      });
+
+      it('names every term and the margin in the drain rule message', () => {
+        expect(issuesFor({ ...drainInput, SHUTDOWN_TIMEOUT_MS: '9999' })).toEqual([
           expect.objectContaining({
             path: ['SHUTDOWN_TIMEOUT_MS'],
-            message: `Shutdown timeout must exceed database statement timeout plus ${String(SHUTDOWN_MARGIN_MS)} ms`,
+            message:
+              'Shutdown timeout must be at least MIN_HTTP_DRAIN_MS + DB_CONNECTION_TIMEOUT_MS + DB_STATEMENT_TIMEOUT_MS + 4000 ms',
           }),
-        ],
-      );
-    });
+        ]);
+      });
 
-    it('keeps the defaults inside the shutdown rule', () => {
-      const { server, database } = parseConfig(requiredInput);
+      it('rejects the old default statement timeout of 15000 with the other defaults', () => {
+        expect(failingFields({ DB_STATEMENT_TIMEOUT_MS: '15000' })).toEqual([
+          'SHUTDOWN_TIMEOUT_MS',
+        ]);
+      });
 
-      expect(server.shutdownTimeoutMs).toBeGreaterThan(
-        database.statementTimeoutMs + SHUTDOWN_MARGIN_MS,
-      );
+      it('keeps the default drain share above the default 5000 ms minimum', () => {
+        expect(parseConfig(requiredInput).server.httpDrainMs).toBeGreaterThanOrEqual(5_000);
+        expect(failingFields({ MIN_HTTP_DRAIN_MS: '6000' })).toEqual([]);
+        expect(failingFields({ MIN_HTTP_DRAIN_MS: '6001' })).toEqual(['SHUTDOWN_TIMEOUT_MS']);
+      });
     });
 
     it('applies the shared logger rules after merging', () => {

@@ -83,7 +83,7 @@ describe('databaseEnvSchema', () => {
       DB_POOL_MAX: 10,
       DB_CONNECTION_TIMEOUT_MS: 5_000,
       DB_POOL_IDLE_TIMEOUT_MS: 10_000,
-      DB_STATEMENT_TIMEOUT_MS: 15_000,
+      DB_STATEMENT_TIMEOUT_MS: 5_000,
       DB_READINESS_TIMEOUT_MS: 1_000,
     });
   });

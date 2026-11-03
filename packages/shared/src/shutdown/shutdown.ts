@@ -48,8 +48,6 @@ export const createShutdownHandlers = (logger: ShutdownLogger, steps: Steps, tim
     }
     state = 'shutting-down';
 
-    logger.info({ event: 'shutdown_signal_received' }, `${signal} received`);
-
     const timeout = setTimeout(() => {
       logger.error(
         { event: 'shutdown_deadline_exceeded', timeoutMs },
@@ -58,16 +56,15 @@ export const createShutdownHandlers = (logger: ShutdownLogger, steps: Steps, tim
       process.exit(1);
     }, timeoutMs);
 
+    logger.info({ event: 'shutdown_signal_received', reason: signal }, `${signal} received`);
+
     try {
       await cleanupResources();
       state = 'stopped';
 
       logger.info({ event: 'server_shutdown_successfully' }, 'server graceful shutdown successful');
-    } catch (error) {
-      logger.error({ event: 'shutdown_failed', error }, 'Server shutdown failed');
-      process.exitCode = 1;
     } finally {
-      clearTimeout(timeout);
+      timeout.unref();
     }
   };
 
