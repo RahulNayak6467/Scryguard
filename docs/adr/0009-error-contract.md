@@ -1,6 +1,6 @@
 # 0009. Error contract
 
-Status: Proposed · 2026-11-02
+Status: Accepted · 2026-11-03
 
 ## Context
 
@@ -57,8 +57,9 @@ error.
   status codes.
 - Leaks are prevented by construction: response text comes from the
   catalogue, not from exceptions.
-- The OpenAPI document publishes the shape, and CI fails on breaking
-  changes to it.
+- The OpenAPI document publishes the shape. CI fails a pull request that
+  breaks it, unless the pull request carries the `breaking-api-change`
+  label.
 - The catalogue grows with every phase and is maintained as part of the
   public contract.
 

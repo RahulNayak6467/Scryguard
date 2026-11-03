@@ -14,4 +14,4 @@ new record rather than rewritten.
 | [0006](0006-lean-aws-footprint.md) | Lean AWS footprint | Accepted |
 | [0007](0007-evidence-required-findings.md) | Findings require evidence | Accepted |
 | [0008](0008-local-models-by-default.md) | Local models by default | Accepted |
-| [0009](0009-error-contract.md) | One error envelope, with status and retry derived from the error kind | Proposed |
+| [0009](0009-error-contract.md) | One error envelope, with status and retry derived from the error kind | Accepted |
