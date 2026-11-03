@@ -129,6 +129,9 @@ const mapToPublicError = (
   issues?: ValidationIssue[],
 ): ErrorResponse => {
   if (error instanceof AppError) {
+    if (error.kind === 'internal') {
+      return internalErrorResponse(requestId);
+    }
     return {
       error: {
         code: error.code,

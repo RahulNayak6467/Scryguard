@@ -63,7 +63,6 @@ describe('error middleware', () => {
       ['invalid_input', 400],
       ['not_found', 404],
       ['payload_too_large', 413],
-      ['internal', 500],
     ] satisfies [ErrorKind, number][])(
       'maps kind %s to status %i with retryable taken from the kind',
       async (kind, status) => {
@@ -80,6 +79,56 @@ describe('error middleware', () => {
         expect(requestIdOf(response)).toEqual(expect.any(String));
       },
     );
+
+    it('maps kind internal to status 500 with the generic internal error body', async () => {
+      const { app } = createHarness(
+        throwing(new AppError({ kind: 'internal', code: 'CODE', message: 'Msg' })),
+      );
+
+      const response = await request(app).get('/probe');
+
+      expect(response.status).toBe(500);
+      expect(response.body).toEqual(envelope(response, internalError));
+      expect(requestIdOf(response)).toEqual(expect.any(String));
+    });
+
+    it('hides the code and message of an internal error but logs them with the same requestId', async () => {
+      const message = 'token exchange failed: connect ECONNREFUSED 10.0.4.12:443';
+      const { app, logs } = createHarness(
+        throwing(new AppError({ kind: 'internal', code: 'GITHUB_TOKEN_FAILED', message })),
+      );
+
+      const response = await request(app).get('/probe');
+
+      expect(response.status).toBe(500);
+      expect(response.body).toEqual(envelope(response, internalError));
+      expect(response.text).not.toContain('GITHUB_TOKEN_FAILED');
+      expect(response.text).not.toContain(message);
+      expect(response.text).not.toContain('10.0.4.12');
+      expect(logs.records()).toHaveLength(1);
+      expect(logs.records()[0]).toMatchObject({
+        event: 'request_failed',
+        code: 'GITHUB_TOKEN_FAILED',
+        kind: 'internal',
+        requestId: requestIdOf(response),
+        errorDetails: { name: 'AppError', message },
+      });
+    });
+
+    it('keeps the code and message of a non-internal error in the response', async () => {
+      const { app } = createHarness(
+        throwing(
+          new AppError({ kind: 'not_found', code: 'RUN_NOT_FOUND', message: 'Run not found' }),
+        ),
+      );
+
+      const response = await request(app).get('/probe');
+
+      expect(response.status).toBe(404);
+      expect(response.body).toEqual(
+        envelope(response, { code: 'RUN_NOT_FOUND', message: 'Run not found', retryable: false }),
+      );
+    });
 
     it('writes no log line itself for a 4xx', async () => {
       const { app, logs } = createHarness(
@@ -506,9 +555,7 @@ describe('error middleware', () => {
     const response = await request(app).get('/probe');
 
     expect(response.status).toBe(500);
-    expect(response.body).toEqual({
-      error: { code: 'DOWN', message: 'Down', requestId: null, retryable: false },
-    });
+    expect(response.body).toEqual({ error: { ...internalError, requestId: null } });
     expect(logs.records()[0]).toMatchObject({ event: 'request_failed', code: 'DOWN' });
     expect(logs.records()[0]).not.toHaveProperty('requestId');
   });
