@@ -2,16 +2,16 @@
 
 ## Now
 
-Current phase: 0 · Foundation (in progress)
-Status: behind 4 h · cuts: C1 (swapped for API keys) · 14 / 10 h · Hosted $0 / $10
-Done: theory; P0.7 coordinator (`shared/shutdown`, module-level state)
-with 15 unit + 11 process tests; `main.ts` ×3; P0.4 shells; CI smoke
-passes locally. 445 unit + 36 integration green.
-Next: shutdown factory `createShutdown({ logger, steps, timeoutMs })`,
-then P0.8 experiments, P0.9 exit ([phases/phase-0.md](phases/phase-0.md)).
-Risk: ~1.5 h left → ~15.5 h, past the 15 h 1.5× line: no more polish;
-factory, P0.8 and P0.9 only.
-Open questions: accept ADR 0009 (keep the OpenAPI line?).
+Current phase: 1 · Vertical slice (not started)
+Status: behind 6.5 h · cuts: C1 (swapped for API keys) · 16.5 / 10 h · Hosted $0 / $10
+Phase 0 done 2026-11-03 (16.5 h of 10): CI green, 493 tests, ADR 0009
+accepted, README Getting started verified on a clean clone.
+Next: `/phase 1` to draft the plan; then its theory.
+Carried over: `/review fresh` of phase 0 was not run, so run it before
+phase 1's first build step. Revisit the handed-over redaction and
+keep-alive drain fix. Drain delay deferred to phase 10.
+Risk: phase 1 starts 6.5 h behind; its end is the first checkpoint
+(actual ÷ plan > 1.10 → C2). One branch and PR per feature from now on.
 
 ## Phases
 
@@ -24,7 +24,7 @@ April, summer May 1–mid-July (15-day trip inside it).
 
 | # | Phase | T | B | Plan | Cum | Deadline | T act | B act | Status |
 |---|---|---:|---:|---:|---:|---|---:|---:|---|
-| 0 | Foundation | 2 | 8 | 10 | 10 | Nov 5 | 2 | 12 | in progress |
+| 0 | Foundation | 2 | 8 | 10 | 10 | Nov 5 | 2 | 14.5 | done Nov 3 |
 | 1 | Vertical slice | 6 | 24 | 30 | 40 | Dec 2 | | | |
 | 2 | Control plane | 14 | 48 | 62 | 102 | Dec 14 | | | |
 | 3 | Reliable processing | 12 | 48 | 60 | 162 | Dec 29 | | | |
@@ -236,3 +236,8 @@ Open important findings from `/review` (removed when fixed).
   tests + 15 unit tests (shipped); worker/publisher shells; CI smoke green
   locally; drain delay deferred to phase 10; gitleaks test found ignored
   by `.gitignore` `secrets/` → rename folder · Hosted $0
+- 2026-11-03 · T 0 · B 2.5 · shutdown factory (user) + tests; P0.8 five
+  experiments: 2 predictions missed (keep-alive held shutdown +6 s; DB
+  hang ended by query_timeout, never the deadline) → drain fix + config
+  rule (handed over); P0.9 local checks pass; ADR 0009 accepted; CI
+  green; phase 0 closed, README Getting started + badge · Hosted $0

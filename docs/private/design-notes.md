@@ -175,7 +175,13 @@ Fields per phase: intent · decided · races and failure cases · break first
   those belong to phases 2–3.
 - **Interview story.** How GitHub App authentication works end to end (app
   JWT → installation token → API call).
-- **Learned.**
+- **Learned.** 2026-11-03, from phase 0. `express.json()` is mounted for
+  every route in `app.ts`, so the webhook's raw body must be captured
+  before it or the HMAC check sees re-serialized JSON. Every wait needs
+  its own timeout (P0.8: query_timeout ended a hung shutdown before the
+  deadline; keep-alive did not, until the drain fix). Phase 0 ran 6.5 h
+  over budget, so phase 1 has no slack; `/review fresh` of phase 0 is
+  still owed. Work through PRs so the OpenAPI breaking check runs.
 
 ### Phase 2 · Control plane
 

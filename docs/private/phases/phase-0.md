@@ -118,6 +118,15 @@ come along unchanged.
 | A pool `end()` that hangs | Deadline force-exit with code 1 at `SHUTDOWN_TIMEOUT_MS` |
 | Start the API with `DATABASE_URL` missing | Refuses to start; the error names the variable, not its value |
 
+**Measured 2026-11-03.** 1: proxy disabled → 503 in 3 ms; timeout toxic →
+503 in 1001 ms; live 200 throughout; one log line per state change. 2:
+ready stays 200; client reconnects on its own. 3: request finished, exit
+0, but 14.0 s SIGTERM → exit (keep-alive held the connection 6 s after the
+response); after the drain fix 8.0 s. 4: idle pool → exit 0 in 0.01 s;
+stuck query → exit 0 at 16.8 s via `query_timeout`, deadline never
+reached. 5: missing, hostless and non-URL values all exit 1, field named,
+fake password absent.
+
 ## 7. Error codes added
 
 All arrive with the copy; P0.6 confirms the set. The readiness 503 is
