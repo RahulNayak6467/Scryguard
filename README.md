@@ -1,5 +1,7 @@
 # Scryguard
 
+[![CI](https://github.com/RahulNayak6467/Scryguard/actions/workflows/ci.yml/badge.svg)](https://github.com/RahulNayak6467/Scryguard/actions/workflows/ci.yml)
+
 A trust gate for pull requests written by AI coding agents.
 
 Coding agents now open a lot of pull requests, and they tend to fail in the
@@ -94,9 +96,34 @@ Amazon SQS · LangGraph.js · Ollama · tree-sitter · Semgrep · Docker and
 ECS Fargate · Terraform · GitHub Actions.
 Details and reasoning: [docs/tech-stack.md](docs/tech-stack.md).
 
+## Getting started
+
+Requires Node.js 24 (24.22.2 or later), pnpm 12.16.1 and Docker.
+
+Run the API against a local PostgreSQL and Redis:
+
+```sh
+pnpm install
+cp .env.example .env
+docker compose up -d --wait
+pnpm db:migrate
+pnpm dev
+```
+
+The API listens on port 8000. `GET /health/live` reports that the process
+is up; `GET /health/ready` reports whether it can reach the database.
+
+Run the checks that CI runs. The integration tests use a separate stack:
+
+```sh
+cp .env.test.example .env.test
+pnpm test:stack
+pnpm validate
+```
+
 ## Roadmap
 
-- [ ] Foundation: workspace, CI, local stack
+- [x] Foundation: workspace, CI, local stack
 - [ ] GitHub App and first Check Run
 - [ ] Data model, GitHub sign-in, API keys, roles and rate limits
 - [ ] Crash-safe review processing (SQS, fencing, outbox)
