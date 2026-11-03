@@ -1,4 +1,4 @@
-import type { Clock, ERROR_KIND } from '@scryguard/shared';
+import type { Clock, ErrorKind } from '@scryguard/shared';
 import type { RequestHandler, Response } from 'express';
 
 import { requireRequestContext } from './request-id.middleware.js';
@@ -7,7 +7,7 @@ type RequestLogLevel = 'debug' | 'info' | 'warn' | 'error';
 
 export interface ResponseError {
   readonly code: string;
-  readonly kind: ERROR_KIND;
+  readonly kind: ErrorKind;
 }
 
 const responseErrors = new WeakMap<Response, ResponseError>();

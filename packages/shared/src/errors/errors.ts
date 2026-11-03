@@ -1,7 +1,7 @@
-export type ERROR_KIND = 'invalid_input' | 'not_found' | 'payload_too_large' | 'internal';
+export type ErrorKind = 'invalid_input' | 'not_found' | 'payload_too_large' | 'internal';
 
 export interface AppErrorOptions {
-  readonly kind: ERROR_KIND;
+  readonly kind: ErrorKind;
   readonly code: string;
   readonly message: string;
   readonly cause?: unknown;
@@ -12,11 +12,11 @@ export const RETRYABLE_BY_KIND = {
   not_found: false,
   payload_too_large: false,
   internal: false,
-} as const satisfies Record<ERROR_KIND, boolean>;
+} as const satisfies Record<ErrorKind, boolean>;
 
 export class AppError extends Error {
   readonly code: string;
-  readonly kind: ERROR_KIND;
+  readonly kind: ErrorKind;
 
   constructor({ kind, code, message, cause }: AppErrorOptions) {
     super(message, cause === undefined ? undefined : { cause });

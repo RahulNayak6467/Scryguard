@@ -12,7 +12,6 @@ export interface DatabaseOptions {
   readonly connectionTimeoutMs: number;
   readonly idleTimeoutMs: number;
   readonly statementTimeoutMs: number;
-  // Identifies the process in pg_stat_activity.
   readonly applicationName: string;
 }
 

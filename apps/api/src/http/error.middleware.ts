@@ -1,5 +1,5 @@
 import { serializeError, type Logger } from '@scryguard/logger';
-import { AppError, RETRYABLE_BY_KIND, type ERROR_KIND } from '@scryguard/shared';
+import { AppError, RETRYABLE_BY_KIND, type ErrorKind } from '@scryguard/shared';
 import type { Request, Response, NextFunction } from 'express';
 import * as z from 'zod';
 import { recordResponseError } from './request-logger.middleware.js';
@@ -10,13 +10,13 @@ const STATUS_BY_KIND = {
   not_found: 404,
   payload_too_large: 413,
   internal: 500,
-} as const satisfies Record<ERROR_KIND, number>;
+} as const satisfies Record<ErrorKind, number>;
 
 const MAX_ISSUES = 10;
 const MAX_ISSUE_TEXT_LENGTH = 200;
 
 interface BodyParserErrorDefinition {
-  kind: ERROR_KIND;
+  kind: ErrorKind;
   code: string;
   message: string;
 }
