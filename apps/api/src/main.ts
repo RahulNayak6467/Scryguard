@@ -10,11 +10,23 @@ import { createApp } from './http/app.js';
 import { loadConfig } from './config.js';
 import { createReadinessChecker } from './health/readiness.js';
 
+const CONNECTIONS_CHECK_INTERVAL_MS = 5_000;
 const SERVICE_NAME = 'scryguard-api';
+const config = loadConfigOrExit(SERVICE_NAME, loadConfig);
+
+const httpDrainMs = config.server.httpDrainMs;
 
 const closeHttpServer = (): Promise<void> => {
   return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      logger.warn(
+        { event: 'http_drain_timeout', httpDrainMs },
+        'HTTP drain timed out; closing remaining connections',
+      );
+      server.closeAllConnections();
+    }, httpDrainMs);
     server.close((error) => {
+      clearTimeout(timeout);
       if (error) {
         reject(error);
         return;
@@ -29,9 +41,6 @@ const steps = [
   { name: 'database', run: () => closeDatabase(databasePool) },
   { name: 'redis', run: () => redis.close() },
 ];
-
-const config = loadConfigOrExit(SERVICE_NAME, loadConfig);
-
 const logger = createLogger({
   level: config.logging.level,
   pretty: config.logging.pretty,
@@ -55,7 +64,7 @@ const checkReadiness = createReadinessChecker({
 
 const app = createApp({ logger, clock: systemClock, checkReadiness, isDraining });
 
-const server = createServer(app);
+const server = createServer({ connectionsCheckingInterval: CONNECTIONS_CHECK_INTERVAL_MS }, app);
 server.requestTimeout = config.server.requestTimeoutMs;
 server.headersTimeout = config.server.headersTimeoutMs;
 server.keepAliveTimeout = config.server.keepAliveTimeoutMs;

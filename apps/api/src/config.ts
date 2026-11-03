@@ -13,8 +13,26 @@ import * as z from 'zod';
 
 export const SHUTDOWN_MARGIN_MS = QUERY_TIMEOUT_MARGIN_MS + QUIT_TIMEOUT_MS;
 
+interface ShutdownTimeouts {
+  readonly SHUTDOWN_TIMEOUT_MS: number;
+  readonly DB_CONNECTION_TIMEOUT_MS: number;
+  readonly DB_STATEMENT_TIMEOUT_MS: number;
+}
+
+const httpDrainMsOf = (env: ShutdownTimeouts): number =>
+  env.SHUTDOWN_TIMEOUT_MS -
+  env.DB_CONNECTION_TIMEOUT_MS -
+  env.DB_STATEMENT_TIMEOUT_MS -
+  SHUTDOWN_MARGIN_MS;
+
 const serverEnvSchema = z.object({
   PORT: integerEnv('PORT', { min: 1, max: 65_535, fallback: 8000 }),
+  MIN_HTTP_DRAIN_MS: integerEnv('MIN_HTTP_DRAIN_MS', {
+    min: 1_000,
+    max: 10_000,
+    fallback: 5_000,
+    unit: 'milliseconds',
+  }),
   HTTP_REQUEST_TIMEOUT_MS: integerEnv('HTTP_REQUEST_TIMEOUT_MS', {
     min: 1_000,
     max: 300_000,
@@ -77,12 +95,13 @@ export const apiEnvSchema = z
       });
     }
 
-    // A request's last query, its query_timeout margin and the Redis quit run in sequence.
-    if (env.SHUTDOWN_TIMEOUT_MS <= env.DB_STATEMENT_TIMEOUT_MS + SHUTDOWN_MARGIN_MS) {
+    // After the HTTP drain, a cut request may still wait for a connection, run its query and
+    // hit the query_timeout margin before the Redis quit; all of it must fit in the deadline.
+    if (httpDrainMsOf(env) < env.MIN_HTTP_DRAIN_MS) {
       context.addIssue({
         code: 'custom',
         path: ['SHUTDOWN_TIMEOUT_MS'],
-        message: `Shutdown timeout must exceed database statement timeout plus ${String(SHUTDOWN_MARGIN_MS)} ms`,
+        message: `Shutdown timeout must be at least MIN_HTTP_DRAIN_MS + DB_CONNECTION_TIMEOUT_MS + DB_STATEMENT_TIMEOUT_MS + ${String(SHUTDOWN_MARGIN_MS)} ms`,
       });
     }
   })
@@ -96,6 +115,7 @@ export const apiEnvSchema = z
         headersTimeoutMs: env.HTTP_HEADERS_TIMEOUT_MS,
         keepAliveTimeoutMs: env.HTTP_KEEP_ALIVE_TIMEOUT_MS,
         shutdownTimeoutMs: env.SHUTDOWN_TIMEOUT_MS,
+        httpDrainMs: httpDrainMsOf(env),
       }),
       database: Object.freeze({
         url: env.DATABASE_URL,

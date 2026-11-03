@@ -7,7 +7,16 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 const apiRoot = resolve(import.meta.dirname, '../..');
 const LISTEN_DEADLINE_MS = 15_000;
-const SHORT_SHUTDOWN_TIMEOUT_MS = 5_000;
+const SHORT_SHUTDOWN_TIMEOUT_MS = 7_000;
+const SHORT_HTTP_DRAIN_MS = 2_000;
+const SHORT_SHUTDOWN_ENV = {
+  SHUTDOWN_TIMEOUT_MS: String(SHORT_SHUTDOWN_TIMEOUT_MS),
+  MIN_HTTP_DRAIN_MS: '1000',
+  HTTP_KEEP_ALIVE_TIMEOUT_MS: '1000',
+  DB_CONNECTION_TIMEOUT_MS: '500',
+  DB_STATEMENT_TIMEOUT_MS: '500',
+  DB_READINESS_TIMEOUT_MS: '500',
+};
 const STEP_ORDER = ['http_server', 'database', 'redis'];
 
 const requireEnv = (name: string): string => {
@@ -58,6 +67,8 @@ const startApi = async (env: Record<string, string> = {}): Promise<ApiProcess> =
       'tsx',
       '--import',
       './test/support/crash-trigger.ts',
+      '--import',
+      './test/support/leaked-handle.ts',
       'src/main.ts',
     ],
     {
@@ -228,12 +239,7 @@ describe('API process lifecycle', () => {
   });
 
   it('stops accepting new connections once shutdown starts', async () => {
-    const api = await startApi({
-      SHUTDOWN_TIMEOUT_MS: String(SHORT_SHUTDOWN_TIMEOUT_MS),
-      HTTP_KEEP_ALIVE_TIMEOUT_MS: '1000',
-      DB_STATEMENT_TIMEOUT_MS: '500',
-      DB_READINESS_TIMEOUT_MS: '500',
-    });
+    const api = await startApi(SHORT_SHUTDOWN_ENV);
     await waitUntilListening(api);
     await holdRequestOpen(api.port);
 
@@ -243,15 +249,47 @@ describe('API process lifecycle', () => {
     expect(await canConnect(api.port)).toBe(false);
   });
 
-  it('force-exits with code 1 at the deadline when a request never finishes', async () => {
-    const api = await startApi({
-      SHUTDOWN_TIMEOUT_MS: String(SHORT_SHUTDOWN_TIMEOUT_MS),
-      HTTP_KEEP_ALIVE_TIMEOUT_MS: '1000',
-      DB_STATEMENT_TIMEOUT_MS: '500',
-      DB_READINESS_TIMEOUT_MS: '500',
-    });
+  it('cuts a request that never finishes once the HTTP drain share runs out, then closes the database and Redis and exits 0', async () => {
+    const api = await startApi(SHORT_SHUTDOWN_ENV);
     await waitUntilListening(api);
-    await holdRequestOpen(api.port);
+    const held = await holdRequestOpen(api.port);
+    const heldClosed = once(held, 'close');
+    const startedAt = Date.now();
+
+    api.child.kill('SIGTERM');
+    const code = await api.exited;
+    const elapsed = Date.now() - startedAt;
+    await heldClosed;
+
+    expect(code).toBe(0);
+    expect(eventsNamed(api, 'http_drain_timeout')).toEqual([
+      expect.objectContaining({ httpDrainMs: SHORT_HTTP_DRAIN_MS }),
+    ]);
+    expect(stepsDone(api)).toEqual(STEP_ORDER);
+    expect(eventsNamed(api, 'step_failed')).toEqual([]);
+    expect(eventsNamed(api, 'shutdown_deadline_exceeded')).toEqual([]);
+    expect(elapsed).toBeGreaterThanOrEqual(SHORT_HTTP_DRAIN_MS - 100);
+    expect(elapsed).toBeLessThan(SHORT_SHUTDOWN_TIMEOUT_MS);
+  });
+
+  it('exits 0 well before the drain share when no request is open, without logging a drain timeout', async () => {
+    const api = await startApi(SHORT_SHUTDOWN_ENV);
+    await waitUntilListening(api);
+    const startedAt = Date.now();
+
+    api.child.kill('SIGTERM');
+    const code = await api.exited;
+    const elapsed = Date.now() - startedAt;
+
+    expect(code).toBe(0);
+    expect(elapsed).toBeLessThan(SHORT_HTTP_DRAIN_MS);
+    expect(stepsDone(api)).toEqual(STEP_ORDER);
+    expect(eventsNamed(api, 'http_drain_timeout')).toEqual([]);
+  });
+
+  it('force-exits with code 1 at the deadline when a leaked handle keeps the process alive after every step', async () => {
+    const api = await startApi({ ...SHORT_SHUTDOWN_ENV, TEST_LEAKED_HANDLE: 'true' });
+    await waitUntilListening(api);
     const startedAt = Date.now();
 
     api.child.kill('SIGTERM');
@@ -259,9 +297,13 @@ describe('API process lifecycle', () => {
     const elapsed = Date.now() - startedAt;
 
     expect(code).toBe(1);
+    expect(stepsDone(api)).toEqual(STEP_ORDER);
+    expect(eventsNamed(api, 'server_shutdown_successfully')).toHaveLength(1);
+    expect(eventsNamed(api, 'shutdown_deadline_exceeded')).toEqual([
+      expect.objectContaining({ timeoutMs: SHORT_SHUTDOWN_TIMEOUT_MS }),
+    ]);
     expect(elapsed).toBeGreaterThanOrEqual(SHORT_SHUTDOWN_TIMEOUT_MS - 100);
     expect(elapsed).toBeLessThan(SHORT_SHUTDOWN_TIMEOUT_MS + 3_000);
-    expect(eventsNamed(api, 'shutdown_deadline_exceeded')).toHaveLength(1);
   });
 
   it.each(['uncaught_exception', 'unhandled_rejection'] as const)(

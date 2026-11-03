@@ -40,7 +40,7 @@ export const databaseEnvSchema = z.object({
   DB_STATEMENT_TIMEOUT_MS: integerEnv('DB_STATEMENT_TIMEOUT_MS', {
     min: 100,
     max: 120_000,
-    fallback: 15_000,
+    fallback: 5_000,
     unit: 'milliseconds',
   }),
   DB_READINESS_TIMEOUT_MS: integerEnv('DB_READINESS_TIMEOUT_MS', {
