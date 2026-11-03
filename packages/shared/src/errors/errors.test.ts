@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { AppError, RETRYABLE_BY_KIND, type ERROR_KIND } from './errors.js';
+import { AppError, RETRYABLE_BY_KIND, type ErrorKind } from './errors.js';
 
-const ALL_KINDS: readonly ERROR_KIND[] = [
+const ALL_KINDS: readonly ErrorKind[] = [
   'invalid_input',
   'not_found',
   'payload_too_large',

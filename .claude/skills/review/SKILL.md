@@ -60,7 +60,9 @@ words the first time), the exact function, option or setting involved,
 and what the library or system actually does underneath. Simpler words,
 never fewer ideas.
 
-Then report what the questions didn't surface:
+Then report what the questions didn't surface. Open with the tally:
+`Found N important (showing 2 now, N−2 queued) · M small · K edge-case
+questions`. On `next`, open with `Important: X fixed · Y open`.
 
 - At most **2 important issues**, in the What / Breaks when / Principle /
   Your move format from `CLAUDE.md`. For a new concept, let the user try

@@ -6,7 +6,10 @@ Current phase: 1 · Vertical slice (not started)
 Status: behind 6.5 h · cuts: C1 (swapped for API keys) · 16.5 / 10 h · Hosted $0 / $10
 Phase 0 done 2026-11-03 (16.5 h of 10): CI green, 493 tests, ADR 0009
 accepted, README Getting started verified on a clean clone.
-Next: `/phase 1` to draft the plan; then its theory.
+Next: P1.0 `/review fresh` of phase 0 and fixes
+([phases/phase-1.md](phases/phase-1.md)); then the permissions page and
+the stolen-token case study before P1.1. Follow-up: `tech-stack.md` drops
+Octokit for phase 1 (plain `fetch` + `node:crypto`), in a public commit.
 Carried over: `/review fresh` of phase 0 was not run, so run it before
 phase 1's first build step. Revisit the handed-over redaction and
 keep-alive drain fix. Drain delay deferred to phase 10.
@@ -197,6 +200,30 @@ per phase:
 ## Review
 
 Open important findings from `/review` (removed when fixed).
+
+From `/review fresh` of phase 0 (2026-11-03); all four found by the user
+in round 1.
+
+1. HTTP drain uses the whole deadline (`shared/src/shutdown/shutdown.ts`,
+   `apps/api/src/main.ts:27`): a half-sent request → exit 1, db and redis
+   skipped. Fix: `httpBudget = shutdown − connection − statement −
+   SHUTDOWN_MARGIN_MS`, then force-close and log the count; config rule
+   with `MIN_HTTP_DRAIN_MS`; fix the defaults. Test: held request →
+   db and redis `step_done`, exit 0.
+2. No exit guarantee after the steps (`shutdown.ts:61-71`): a leaked
+   handle → SIGKILL 137. Fix: keep the deadline armed, `unref` it. Tests
+   (tester): real-process clean exit 0 fast and leaked interval exit 1
+   at the deadline; rewrite the line 204 timer test; fake timers in every
+   unit test that starts a shutdown.
+3. `internal` AppError message reaches the 500 body
+   (`apps/api/src/http/error.middleware.ts`, `mapToPublicError`): breaks
+   ADR 0009. Fix: 5xx body always `INTERNAL_ERROR` + generic message;
+   real code and message stay in the log. Tests: change the `internal`
+   row in `error.middleware.test.ts:61-78`; log keeps the real code.
+4. Redaction misses `url` and depth > 1 (`logger/src/redaction.ts`):
+   `logger.info({ config })` prints the database password. Fix in P1.6:
+   allowlist logging is the guarantee, `url` + level-2 paths the net.
+   Test: log each app's real parsed config, search for secret values.
 
 ## Log
 

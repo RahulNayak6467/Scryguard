@@ -2,10 +2,24 @@ import * as z from 'zod';
 
 import { connectionUrl, integerEnv } from './fields.js';
 
+const ALLOWED_URL_PARAMS = new Set(['sslmode']);
+
+// pg lets connection-string parameters override pool options such as statement_timeout.
+const checkDatabaseUrl = (url: URL): string[] => {
+  const problems: string[] = [];
+  if (url.pathname.length <= 1) {
+    problems.push('DATABASE_URL must include a database name');
+  }
+  if ([...url.searchParams.keys()].some((key) => !ALLOWED_URL_PARAMS.has(key)) || url.hash !== '') {
+    problems.push('DATABASE_URL may only set sslmode; use the DB_* variables for pool settings');
+  }
+  return problems;
+};
+
 export const databaseUrlSchema = connectionUrl(
   'DATABASE_URL',
   ['postgres:', 'postgresql:'],
-  (url) => (url.pathname.length <= 1 ? ['DATABASE_URL must include a database name'] : []),
+  checkDatabaseUrl,
 );
 
 export const databaseEnvSchema = z.object({

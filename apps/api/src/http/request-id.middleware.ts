@@ -45,7 +45,6 @@ export const createRequestIdMiddleware = (rootLogger: Logger): RequestHandler =>
         clientRequestId === undefined ? { requestId } : { requestId, clientRequestId },
       ),
     };
-    requireRequestContext(request);
     response.setHeader(REQUEST_ID_HEADER, requestId);
     next();
   };

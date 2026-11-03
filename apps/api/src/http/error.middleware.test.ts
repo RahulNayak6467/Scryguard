@@ -1,4 +1,4 @@
-import { AppError, RETRYABLE_BY_KIND, systemClock, type ERROR_KIND } from '@scryguard/shared';
+import { AppError, RETRYABLE_BY_KIND, systemClock, type ErrorKind } from '@scryguard/shared';
 import express, { type ErrorRequestHandler, type RequestHandler } from 'express';
 import request, { type Response as TestResponse } from 'supertest';
 import { describe, expect, it } from 'vitest';
@@ -64,7 +64,7 @@ describe('error middleware', () => {
       ['not_found', 404],
       ['payload_too_large', 413],
       ['internal', 500],
-    ] satisfies [ERROR_KIND, number][])(
+    ] satisfies [ErrorKind, number][])(
       'maps kind %s to status %i with retryable taken from the kind',
       async (kind, status) => {
         const { app } = createHarness(

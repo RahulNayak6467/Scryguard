@@ -182,6 +182,11 @@ Fields per phase: intent · decided · races and failure cases · break first
   deadline; keep-alive did not, until the drain fix). Phase 0 ran 6.5 h
   over budget, so phase 1 has no slack; `/review fresh` of phase 0 is
   still owed. Work through PRs so the OpenAPI breaking check runs.
+  Sizing: phase 0 ran 1.65× (rewrites in a second file, then a split
+  and a refactor; tests as large as the code; side questions mid-build).
+  Estimate tasks with their tests; write in the final file from the
+  start; each task notes its estimate and 1.5× stop line before it
+  starts; ask for a nudge after 15 min stuck; park side questions.
 
 ### Phase 2 · Control plane
 

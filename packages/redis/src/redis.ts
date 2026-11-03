@@ -185,14 +185,12 @@ export const createRedisClient = (
 
   redisClient.on('close', () => {
     if (connectionState === 'connected') {
-      if (connectionState === 'connected') {
-        logger.error(
-          { component: 'redis', event: 'redis_connection_lost' },
-          'Redis connection closed',
-        );
-        downSince = clock.monotonicMs();
-        connectionState = 'disconnected';
-      }
+      logger.error(
+        { component: 'redis', event: 'redis_connection_lost' },
+        'Redis connection closed',
+      );
+      downSince = clock.monotonicMs();
+      connectionState = 'disconnected';
     }
   });
 

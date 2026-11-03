@@ -32,7 +32,7 @@ export const createReadinessChecker = ({
     const check = checkDatabaseHealth(databasePool);
     inFlight = check;
     const clear = () => {
-      if (inFlight === check) inFlight = undefined;
+      inFlight = undefined;
     };
     void check.then(clear, clear);
     return check;
