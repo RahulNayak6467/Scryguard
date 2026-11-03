@@ -2,6 +2,8 @@ import { EventEmitter } from 'node:events';
 
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
+import { createShutdownHandlers, type Steps } from './shutdown.js';
+
 type Listener = (...args: unknown[]) => void;
 
 const listenersOf = (event: string): Listener[] =>
@@ -14,13 +16,12 @@ const removeListener = (event: string, listener: Listener): void => {
 const TIMEOUT_MS = 1_000;
 const HANDLED_EVENTS = ['SIGINT', 'SIGTERM', 'uncaughtException', 'unhandledRejection'] as const;
 
-// The coordinator keeps its state at module level, so every test needs a fresh copy.
-const loadShutdown = async () => {
-  vi.resetModules();
-  return import('./shutdown.js');
-};
-
 const createLogger = () => ({ fatal: vi.fn(), warn: vi.fn(), info: vi.fn(), error: vi.fn() });
+
+const setup = (steps: Steps = [], logger = createLogger()) => ({
+  logger,
+  ...createShutdownHandlers(logger, steps, TIMEOUT_MS),
+});
 
 const recordingStep = (name: string, calls: string[]) => ({
   name,
@@ -37,6 +38,14 @@ const deferred = () => {
   });
   return { promise, finish };
 };
+
+const slowStep = (name: string, calls: string[], until: Promise<void>) => ({
+  name,
+  run: () => {
+    calls.push(name);
+    return until;
+  },
+});
 
 const loggedEvents = (logger: ReturnType<typeof createLogger>, level: 'info' | 'warn' | 'error') =>
   logger[level].mock.calls.map(([fields]) => (fields as { event: string }).event);
@@ -56,21 +65,14 @@ describe('shutdown coordinator', () => {
   });
 
   it('runs the steps in order, each only after the previous one finished', async () => {
-    const { handleShutdown } = await loadShutdown();
     const calls: string[] = [];
     const first = deferred();
-    const steps = [
-      {
-        name: 'first',
-        run: () => {
-          calls.push('first');
-          return first.promise;
-        },
-      },
+    const { handleShutdown } = setup([
+      slowStep('first', calls, first.promise),
       recordingStep('second', calls),
-    ];
+    ]);
 
-    const done = handleShutdown('SIGTERM', createLogger(), steps, TIMEOUT_MS);
+    const done = handleShutdown('SIGTERM');
     await Promise.resolve();
     expect(calls).toEqual(['first']);
 
@@ -80,16 +82,13 @@ describe('shutdown coordinator', () => {
   });
 
   it('logs every finished step by name and leaves the exit code alone', async () => {
-    const { handleShutdown } = await loadShutdown();
-    const logger = createLogger();
     const calls: string[] = [];
+    const { handleShutdown, logger } = setup([
+      recordingStep('a', calls),
+      recordingStep('b', calls),
+    ]);
 
-    await handleShutdown(
-      'SIGTERM',
-      logger,
-      [recordingStep('a', calls), recordingStep('b', calls)],
-      TIMEOUT_MS,
-    );
+    await handleShutdown('SIGTERM');
 
     expect(logger.info).toHaveBeenCalledWith({ event: 'step_done', step: 'a' }, 'Step done');
     expect(logger.info).toHaveBeenCalledWith({ event: 'step_done', step: 'b' }, 'Step done');
@@ -97,16 +96,14 @@ describe('shutdown coordinator', () => {
   });
 
   it('still runs later steps when one rejects, names the failed step, and sets exit code 1', async () => {
-    const { handleShutdown } = await loadShutdown();
-    const logger = createLogger();
     const calls: string[] = [];
     const failure = new Error('pool end failed');
-    const steps = [
+    const { handleShutdown, logger } = setup([
       { name: 'database', run: () => Promise.reject(failure) },
       recordingStep('redis', calls),
-    ];
+    ]);
 
-    await handleShutdown('SIGTERM', logger, steps, TIMEOUT_MS);
+    await handleShutdown('SIGTERM');
 
     expect(calls).toEqual(['redis']);
     expect(logger.error).toHaveBeenCalledWith(
@@ -117,9 +114,8 @@ describe('shutdown coordinator', () => {
   });
 
   it('treats a step that throws before returning a promise like a failed step', async () => {
-    const { handleShutdown } = await loadShutdown();
     const calls: string[] = [];
-    const steps = [
+    const { handleShutdown } = setup([
       {
         name: 'broken',
         run: (): Promise<void> => {
@@ -127,31 +123,21 @@ describe('shutdown coordinator', () => {
         },
       },
       recordingStep('after', calls),
-    ];
+    ]);
 
-    await handleShutdown('SIGTERM', createLogger(), steps, TIMEOUT_MS);
+    await handleShutdown('SIGTERM');
 
     expect(calls).toEqual(['after']);
     expect(process.exitCode).toBe(1);
   });
 
   it('runs the steps once when a second request arrives while the first is running', async () => {
-    const { handleShutdown } = await loadShutdown();
-    const logger = createLogger();
     const calls: string[] = [];
     const slow = deferred();
-    const steps = [
-      {
-        name: 'slow',
-        run: () => {
-          calls.push('slow');
-          return slow.promise;
-        },
-      },
-    ];
+    const { handleShutdown, logger } = setup([slowStep('slow', calls, slow.promise)]);
 
-    const first = handleShutdown('SIGTERM', logger, steps, TIMEOUT_MS);
-    await handleShutdown('SIGTERM', logger, steps, TIMEOUT_MS);
+    const first = handleShutdown('SIGTERM');
+    await handleShutdown('SIGTERM');
     slow.finish();
     await first;
 
@@ -160,29 +146,22 @@ describe('shutdown coordinator', () => {
   });
 
   it('runs nothing when asked again after it has stopped', async () => {
-    const { handleShutdown } = await loadShutdown();
-    const logger = createLogger();
     const calls: string[] = [];
-    const steps = [recordingStep('only', calls)];
+    const { handleShutdown, logger } = setup([recordingStep('only', calls)]);
 
-    await handleShutdown('SIGTERM', logger, steps, TIMEOUT_MS);
-    await handleShutdown('SIGINT', logger, steps, TIMEOUT_MS);
+    await handleShutdown('SIGTERM');
+    await handleShutdown('SIGINT');
 
     expect(calls).toEqual(['only']);
     expect(loggedEvents(logger, 'warn')).toEqual(['server_already_shutdown']);
   });
 
   it('reports draining from the moment shutdown starts, before any step finishes', async () => {
-    const { handleShutdown, isDraining } = await loadShutdown();
     const slow = deferred();
+    const { handleShutdown, isDraining } = setup([slowStep('slow', [], slow.promise)]);
 
     expect(isDraining()).toBe(false);
-    const done = handleShutdown(
-      'SIGTERM',
-      createLogger(),
-      [{ name: 'slow', run: () => slow.promise }],
-      TIMEOUT_MS,
-    );
+    const done = handleShutdown('SIGTERM');
     expect(isDraining()).toBe(true);
 
     slow.finish();
@@ -190,13 +169,27 @@ describe('shutdown coordinator', () => {
     expect(isDraining()).toBe(true);
   });
 
+  it('gives each call its own state, so one shutdown never drains another', async () => {
+    const calls: string[] = [];
+    const first = setup([recordingStep('first', calls)]);
+    const second = setup([recordingStep('second', calls)]);
+
+    await first.handleShutdown('SIGTERM');
+
+    expect(first.isDraining()).toBe(true);
+    expect(second.isDraining()).toBe(false);
+
+    await second.handleShutdown('SIGTERM');
+    expect(calls).toEqual(['first', 'second']);
+  });
+
   it('force-exits with code 1 at the deadline when a step hangs', async () => {
     vi.useFakeTimers();
-    const { handleShutdown } = await loadShutdown();
-    const logger = createLogger();
-    const hung = { name: 'hung', run: () => new Promise<void>(() => undefined) };
+    const { handleShutdown, logger } = setup([
+      { name: 'hung', run: () => new Promise<void>(() => undefined) },
+    ]);
 
-    void handleShutdown('SIGTERM', logger, [hung], TIMEOUT_MS);
+    void handleShutdown('SIGTERM');
     await vi.advanceTimersByTimeAsync(TIMEOUT_MS - 1);
     expect(exit).not.toHaveBeenCalled();
 
@@ -210,9 +203,9 @@ describe('shutdown coordinator', () => {
 
   it('clears the deadline after a fast shutdown, so nothing force-exits later', async () => {
     vi.useFakeTimers();
-    const { handleShutdown } = await loadShutdown();
+    const { handleShutdown } = setup([recordingStep('fast', [])]);
 
-    await handleShutdown('SIGTERM', createLogger(), [recordingStep('fast', [])], TIMEOUT_MS);
+    await handleShutdown('SIGTERM');
     await vi.advanceTimersByTimeAsync(TIMEOUT_MS * 2);
 
     expect(exit).not.toHaveBeenCalled();
@@ -222,12 +215,11 @@ describe('shutdown coordinator', () => {
   it.each(['uncaught_exception', 'unhandled_rejection'] as const)(
     'on %s logs fatal with the error, runs every step, and keeps exit code 1',
     async (crash) => {
-      const { handleCrash } = await loadShutdown();
-      const logger = createLogger();
       const calls: string[] = [];
       const error = new Error('boom');
+      const { handleCrash, logger } = setup([recordingStep('a', calls)]);
 
-      await handleCrash(crash, error, logger, [recordingStep('a', calls)], TIMEOUT_MS);
+      await handleCrash(crash, error);
 
       expect(logger.fatal).toHaveBeenCalledExactlyOnceWith(
         { event: crash, err: error },
@@ -239,10 +231,9 @@ describe('shutdown coordinator', () => {
   );
 
   it('accepts a crash value that is not an Error', async () => {
-    const { handleCrash } = await loadShutdown();
-    const logger = createLogger();
+    const { handleCrash, logger } = setup();
 
-    await handleCrash('unhandled_rejection', 'plain text reason', logger, [], TIMEOUT_MS);
+    await handleCrash('unhandled_rejection', 'plain text reason');
 
     expect(logger.fatal).toHaveBeenCalledWith(
       { event: 'unhandled_rejection', err: 'plain text reason' },
@@ -252,22 +243,12 @@ describe('shutdown coordinator', () => {
   });
 
   it('turns a running SIGTERM shutdown into exit code 1 when a crash arrives, without rerunning steps', async () => {
-    const { handleCrash, handleShutdown } = await loadShutdown();
-    const logger = createLogger();
     const calls: string[] = [];
     const slow = deferred();
-    const steps = [
-      {
-        name: 'slow',
-        run: () => {
-          calls.push('slow');
-          return slow.promise;
-        },
-      },
-    ];
+    const { handleCrash, handleShutdown } = setup([slowStep('slow', calls, slow.promise)]);
 
-    const signal = handleShutdown('SIGTERM', logger, steps, TIMEOUT_MS);
-    await handleCrash('uncaught_exception', new Error('mid-drain'), logger, steps, TIMEOUT_MS);
+    const signal = handleShutdown('SIGTERM');
+    await handleCrash('uncaught_exception', new Error('mid-drain'));
     slow.finish();
     await signal;
 
@@ -275,7 +256,7 @@ describe('shutdown coordinator', () => {
     expect(process.exitCode).toBe(1);
   });
 
-  describe('installShutdownHandlers', () => {
+  describe('install', () => {
     const added = new Map<string, Listener[]>();
 
     const newListeners = (event: string, before: readonly Listener[]) =>
@@ -288,20 +269,20 @@ describe('shutdown coordinator', () => {
       added.clear();
     });
 
-    it('installs nothing when the module is only imported', async () => {
+    it('installs nothing until install is called', () => {
       const before = HANDLED_EVENTS.map((event) => listenersOf(event).length);
 
-      await loadShutdown();
+      setup();
 
       expect(HANDLED_EVENTS.map((event) => listenersOf(event).length)).toEqual(before);
     });
 
     it('adds exactly one listener per event, and SIGTERM runs the steps', async () => {
-      const { installShutdownHandlers } = await loadShutdown();
-      const before = new Map(HANDLED_EVENTS.map((event) => [event, listenersOf(event)]));
       const calls: string[] = [];
+      const { install } = setup([recordingStep('a', calls)]);
+      const before = new Map(HANDLED_EVENTS.map((event) => [event, listenersOf(event)]));
 
-      installShutdownHandlers(createLogger(), [recordingStep('a', calls)], TIMEOUT_MS);
+      install();
       for (const event of HANDLED_EVENTS) {
         added.set(event, newListeners(event, before.get(event) ?? []));
       }

@@ -1,6 +1,6 @@
 import { loadConfigOrExit } from '@scryguard/config';
 import { createLogger } from '@scryguard/logger';
-import { installShutdownHandlers } from '@scryguard/shared';
+import { createShutdownHandlers } from '@scryguard/shared';
 
 import { loadConfig } from './config.js';
 
@@ -31,6 +31,6 @@ const steps = [
   },
 ];
 
-installShutdownHandlers(logger, steps, config.shutdownTimeoutMs);
+createShutdownHandlers(logger, steps, config.shutdownTimeoutMs).install();
 
 logger.info({ event: 'publisher_started' }, 'Publisher started');
