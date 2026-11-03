@@ -85,6 +85,13 @@ them (design-notes, phase 1).
   exit code?
 - Done when: the old tests pass on your rewrite; you can say why the
   deadline timer is `unref`'d and why the start waits a microtask.
+- Handed over: keep-alive drain fix (2026-11-03), revisit. Found in P0.8
+  experiment 3: a connection busy at `server.close()` stayed open for the
+  keep-alive timeout after its response (+6 s per shutdown; with
+  keep-alive ≥ the shutdown timeout, exit 1). Written by Claude at the
+  user's request: `Connection: close` while draining and ending the
+  socket when a response finishes during the drain (`app.ts`), the rule
+  keep-alive < shutdown timeout, keep-alive max 120 s → 60 s.
 
 ## 4. Data model and migrations
 
