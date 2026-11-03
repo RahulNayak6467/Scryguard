@@ -15,8 +15,8 @@ const ready: ReadinessChecker = () => Promise.resolve({ status: 'ready' });
 const draining: ReadinessChecker = () =>
   Promise.resolve({ status: 'not_ready', reason: 'draining' });
 
-const createTestApp = (checkReadiness: ReadinessChecker = ready) =>
-  createApp({ logger: silentLogger(), clock: systemClock, checkReadiness });
+const createTestApp = (checkReadiness: ReadinessChecker = ready, isDraining = () => false) =>
+  createApp({ logger: silentLogger(), clock: systemClock, checkReadiness, isDraining });
 
 // A small actual body, so the early 413 can't race a large upload.
 const sendDeclaredOversizedBody = () =>
@@ -115,6 +115,42 @@ describe('createApp', () => {
 
     expect(response.headers['content-type']).toMatch(/^application\/json\b/u);
     expect(response.text).not.toMatch(/<!doctype|<html|<pre/iu);
+  });
+
+  describe('connection reuse while draining', () => {
+    const sendKeepAlive = (app: ReturnType<typeof createTestApp>, path = '/health/live') =>
+      request(app).get(path).set('connection', 'keep-alive');
+
+    it('keeps the connection open while running', async () => {
+      const response = await sendKeepAlive(createTestApp());
+
+      expect(response.headers.connection).toBe('keep-alive');
+    });
+
+    it.each([
+      ['a 200', '/health/live'],
+      ['a 503', '/health/ready'],
+      ['a 404', '/nope'],
+    ])('asks the client to close the connection on %s once draining', async (_label, path) => {
+      const response = await sendKeepAlive(
+        createTestApp(draining, () => true),
+        path,
+      );
+
+      expect(response.headers.connection).toBe('close');
+    });
+
+    it('checks the drain state on every request, not once at startup', async () => {
+      let shuttingDown = false;
+      const app = createTestApp(ready, () => shuttingDown);
+
+      const before = await sendKeepAlive(app);
+      shuttingDown = true;
+      const after = await sendKeepAlive(app);
+
+      expect(before.headers.connection).toBe('keep-alive');
+      expect(after.headers.connection).toBe('close');
+    });
   });
 
   describe('body limit over a real socket', () => {

@@ -15,14 +15,33 @@ export interface AppDependencies {
   readonly logger: Logger;
   readonly clock: Clock;
   readonly checkReadiness: ReadinessChecker;
+  readonly isDraining: () => boolean;
 }
 
-export const createApp = ({ logger, clock, checkReadiness }: AppDependencies): Express => {
+export const createApp = ({
+  logger,
+  clock,
+  checkReadiness,
+  isDraining,
+}: AppDependencies): Express => {
   const app = express();
   app.disable('x-powered-by');
 
   app.use((_req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
+    next();
+  });
+  // A keep-alive connection that finishes during the drain would hold server.close() open.
+  // The header covers requests that start draining; the finish check covers those already running.
+  app.use((req, res, next) => {
+    if (isDraining()) {
+      res.setHeader('Connection', 'close');
+    }
+    res.on('finish', () => {
+      if (isDraining()) {
+        req.socket.end();
+      }
+    });
     next();
   });
   // Before body parsing, so parser errors carry the request ID.

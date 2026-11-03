@@ -179,9 +179,58 @@ describe('API process lifecycle', () => {
     expect(Date.now() - startedAt).toBeLessThan(3_000);
   });
 
+  it('closes a keep-alive connection after its drain response instead of waiting out keep-alive', async () => {
+    const api = await startApi({
+      HTTP_KEEP_ALIVE_TIMEOUT_MS: '10000',
+      SHUTDOWN_TIMEOUT_MS: '20000',
+    });
+    await waitUntilListening(api);
+    const held = await holdRequestOpen(api.port);
+    let response = '';
+    held.on('data', (chunk: Buffer) => (response += chunk.toString('utf8')));
+
+    api.child.kill('SIGTERM');
+    await new Promise((wait) => setTimeout(wait, 200));
+    const finishedAt = Date.now();
+    held.write('\r\n');
+
+    expect(await api.exited).toBe(0);
+    expect(Date.now() - finishedAt).toBeLessThan(3_000);
+    expect(response).toMatch(/^HTTP\/1\.1 200/);
+    expect(response).toMatch(/^connection: close$/im);
+  });
+
+  it('closes the connection of a request that was already running when shutdown started', async () => {
+    const api = await startApi({
+      HTTP_KEEP_ALIVE_TIMEOUT_MS: '10000',
+      SHUTDOWN_TIMEOUT_MS: '20000',
+    });
+    await waitUntilListening(api);
+    const socket = connect(api.port, '127.0.0.1');
+    socket.on('error', () => undefined);
+    sockets.push(socket);
+    await once(socket, 'connect');
+    let response = '';
+    socket.on('data', (chunk: Buffer) => (response += chunk.toString('utf8')));
+    socket.write(
+      'POST /slow HTTP/1.1\r\nHost: localhost\r\nContent-Type: application/json\r\nContent-Length: 2\r\n\r\n{',
+    );
+    await new Promise((wait) => setTimeout(wait, 200));
+
+    api.child.kill('SIGTERM');
+    await new Promise((wait) => setTimeout(wait, 200));
+    const finishedAt = Date.now();
+    socket.write('}');
+
+    expect(await api.exited).toBe(0);
+    expect(Date.now() - finishedAt).toBeLessThan(3_000);
+    expect(response).toMatch(/^HTTP\/1\.1 404/);
+  });
+
   it('stops accepting new connections once shutdown starts', async () => {
     const api = await startApi({
       SHUTDOWN_TIMEOUT_MS: String(SHORT_SHUTDOWN_TIMEOUT_MS),
+      HTTP_KEEP_ALIVE_TIMEOUT_MS: '1000',
       DB_STATEMENT_TIMEOUT_MS: '500',
       DB_READINESS_TIMEOUT_MS: '500',
     });
@@ -197,6 +246,7 @@ describe('API process lifecycle', () => {
   it('force-exits with code 1 at the deadline when a request never finishes', async () => {
     const api = await startApi({
       SHUTDOWN_TIMEOUT_MS: String(SHORT_SHUTDOWN_TIMEOUT_MS),
+      HTTP_KEEP_ALIVE_TIMEOUT_MS: '1000',
       DB_STATEMENT_TIMEOUT_MS: '500',
       DB_READINESS_TIMEOUT_MS: '500',
     });

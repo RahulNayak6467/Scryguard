@@ -119,7 +119,7 @@ describe('API configuration', () => {
     const timeouts = [
       { field: 'HTTP_REQUEST_TIMEOUT_MS', min: 1_000, max: 300_000 },
       { field: 'HTTP_HEADERS_TIMEOUT_MS', min: 1_000, max: 120_000 },
-      { field: 'HTTP_KEEP_ALIVE_TIMEOUT_MS', min: 1_000, max: 120_000 },
+      { field: 'HTTP_KEEP_ALIVE_TIMEOUT_MS', min: 1_000, max: 60_000 },
       { field: 'SHUTDOWN_TIMEOUT_MS', min: 5_000, max: 120_000 },
     ] as const;
 
@@ -127,6 +127,8 @@ describe('API configuration', () => {
     const quiet = {
       HTTP_REQUEST_TIMEOUT_MS: '300000',
       HTTP_HEADERS_TIMEOUT_MS: '1000',
+      HTTP_KEEP_ALIVE_TIMEOUT_MS: '1000',
+      SHUTDOWN_TIMEOUT_MS: '120000',
       DB_STATEMENT_TIMEOUT_MS: '100',
       DB_READINESS_TIMEOUT_MS: '100',
     };
@@ -165,6 +167,32 @@ describe('API configuration', () => {
       expect(
         failingFields({ DB_STATEMENT_TIMEOUT_MS: '1000', DB_READINESS_TIMEOUT_MS: readiness }),
       ).toEqual(valid ? [] : ['DB_READINESS_TIMEOUT_MS']);
+    });
+
+    it.each([
+      ['19999', true],
+      ['20000', false],
+    ])('keep-alive timeout %s against a 20000 shutdown timeout → valid=%s', (keepAlive, valid) => {
+      expect(
+        failingFields({ SHUTDOWN_TIMEOUT_MS: '20000', HTTP_KEEP_ALIVE_TIMEOUT_MS: keepAlive }),
+      ).toEqual(valid ? [] : ['HTTP_KEEP_ALIVE_TIMEOUT_MS']);
+    });
+
+    it('names both variables in the keep-alive rule message', () => {
+      expect(
+        issuesFor({ SHUTDOWN_TIMEOUT_MS: '20000', HTTP_KEEP_ALIVE_TIMEOUT_MS: '25000' }),
+      ).toEqual([
+        expect.objectContaining({
+          path: ['HTTP_KEEP_ALIVE_TIMEOUT_MS'],
+          message: 'Keep-alive timeout must be less than shutdown timeout',
+        }),
+      ]);
+    });
+
+    it('keeps the default keep-alive below the default shutdown timeout', () => {
+      const { server } = parseConfig(requiredInput);
+
+      expect(server.keepAliveTimeoutMs).toBeLessThan(server.shutdownTimeoutMs);
     });
 
     it('builds the shutdown margin from the query timeout margin and the Redis quit timeout', () => {

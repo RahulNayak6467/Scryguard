@@ -29,7 +29,7 @@ const serverEnvSchema = z.object({
   }),
   HTTP_KEEP_ALIVE_TIMEOUT_MS: integerEnv('HTTP_KEEP_ALIVE_TIMEOUT_MS', {
     min: 1_000,
-    max: 120_000,
+    max: 60_000,
     fallback: 5_000,
     unit: 'milliseconds',
   }),
@@ -65,6 +65,15 @@ export const apiEnvSchema = z
         code: 'custom',
         path: ['DB_READINESS_TIMEOUT_MS'],
         message: 'Database readiness timeout must not exceed statement timeout',
+      });
+    }
+
+    // A connection that just finished a request stays open until keep-alive expires.
+    if (env.HTTP_KEEP_ALIVE_TIMEOUT_MS >= env.SHUTDOWN_TIMEOUT_MS) {
+      context.addIssue({
+        code: 'custom',
+        path: ['HTTP_KEEP_ALIVE_TIMEOUT_MS'],
+        message: 'Keep-alive timeout must be less than shutdown timeout',
       });
     }
 

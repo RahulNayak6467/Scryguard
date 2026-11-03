@@ -21,7 +21,12 @@ const notReady: ReadinessChecker = () =>
 const broken: ReadinessChecker = () => Promise.reject(new Error('checker bug'));
 
 const createTestApp = (checkReadiness: ReadinessChecker = ready) =>
-  createApp({ logger: silentLogger(), clock: systemClock, checkReadiness });
+  createApp({
+    logger: silentLogger(),
+    clock: systemClock,
+    checkReadiness,
+    isDraining: () => false,
+  });
 
 const strictError = z.strictObject({
   error: z.strictObject(errorResponseSchema.shape.error.shape),

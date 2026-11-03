@@ -53,7 +53,7 @@ const checkReadiness = createReadinessChecker({
   logger,
 });
 
-const app = createApp({ logger, clock: systemClock, checkReadiness });
+const app = createApp({ logger, clock: systemClock, checkReadiness, isDraining });
 
 const server = createServer(app);
 server.requestTimeout = config.server.requestTimeoutMs;
