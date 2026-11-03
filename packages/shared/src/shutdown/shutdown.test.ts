@@ -47,6 +47,12 @@ const slowStep = (name: string, calls: string[], until: Promise<void>) => ({
   },
 });
 
+const armedDeadline = (spy: MockInstance<typeof setTimeout>): NodeJS.Timeout => {
+  const result = spy.mock.results[0];
+  if (result?.type !== 'return') throw new Error('No deadline timer was armed');
+  return result.value;
+};
+
 const loggedEvents = (logger: ReturnType<typeof createLogger>, level: 'info' | 'warn' | 'error') =>
   logger[level].mock.calls.map(([fields]) => (fields as { event: string }).event);
 
@@ -56,6 +62,7 @@ describe('shutdown coordinator', () => {
 
   beforeEach(() => {
     originalExitCode = process.exitCode;
+    vi.useFakeTimers();
     exit = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
   });
 
@@ -184,7 +191,6 @@ describe('shutdown coordinator', () => {
   });
 
   it('force-exits with code 1 at the deadline when a step hangs', async () => {
-    vi.useFakeTimers();
     const { handleShutdown, logger } = setup([
       { name: 'hung', run: () => new Promise<void>(() => undefined) },
     ]);
@@ -201,15 +207,59 @@ describe('shutdown coordinator', () => {
     );
   });
 
-  it('clears the deadline after a fast shutdown, so nothing force-exits later', async () => {
-    vi.useFakeTimers();
-    const { handleShutdown } = setup([recordingStep('fast', [])]);
+  it('leaves the deadline armed but unref-ed after a clean shutdown, so it never holds the process open', async () => {
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+    const { handleShutdown, logger } = setup([recordingStep('fast', [])]);
 
     await handleShutdown('SIGTERM');
-    await vi.advanceTimersByTimeAsync(TIMEOUT_MS * 2);
 
+    expect(setTimeoutSpy).toHaveBeenCalledExactlyOnceWith(expect.any(Function), TIMEOUT_MS);
+    const deadline = armedDeadline(setTimeoutSpy);
+    expect(deadline.hasRef()).toBe(false);
+    expect(vi.getTimerCount()).toBe(1);
     expect(exit).not.toHaveBeenCalled();
-    expect(vi.getTimerCount()).toBe(0);
+    expect(process.exitCode).toBe(originalExitCode);
+    expect(loggedEvents(logger, 'info')).toContain('server_shutdown_successfully');
+  });
+
+  it('still force-exits with code 1 at the deadline when a leaked handle keeps the process alive after a clean shutdown', async () => {
+    const { handleShutdown, logger } = setup([recordingStep('fast', [])]);
+
+    await handleShutdown('SIGTERM');
+    await vi.advanceTimersByTimeAsync(TIMEOUT_MS - 1);
+    expect(exit).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(exit).toHaveBeenCalledExactlyOnceWith(1);
+    expect(loggedEvents(logger, 'error')).toEqual(['shutdown_deadline_exceeded']);
+  });
+
+  it('keeps the deadline ref-ed while a step is still running', async () => {
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+    const slow = deferred();
+    const { handleShutdown } = setup([slowStep('slow', [], slow.promise)]);
+
+    const done = handleShutdown('SIGTERM');
+    const deadline = armedDeadline(setTimeoutSpy);
+    expect(deadline.hasRef()).toBe(true);
+
+    slow.finish();
+    await done;
+    expect(deadline.hasRef()).toBe(false);
+  });
+
+  it('leaves the deadline unref-ed after a step failed', async () => {
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+    const { handleShutdown } = setup([
+      { name: 'database', run: () => Promise.reject(new Error('pool end failed')) },
+    ]);
+
+    await handleShutdown('SIGTERM');
+
+    const deadline = armedDeadline(setTimeoutSpy);
+    expect(deadline.hasRef()).toBe(false);
+    expect(process.exitCode).toBe(1);
+    expect(exit).not.toHaveBeenCalled();
   });
 
   it.each(['uncaught_exception', 'unhandled_rejection'] as const)(
