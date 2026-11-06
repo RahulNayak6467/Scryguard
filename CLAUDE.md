@@ -24,6 +24,15 @@ phase; `/phase` designs each phase from it.
 - **In learn mode**, don't hand over finished code. Help ladder when the user
   is stuck: nudge (a question) → pattern (approach in words or pseudocode) →
   snippet (small, last resort). Start at nudge unless asked for more.
+- **Syntax handover (the one exception).** When the design page is approved
+  and the user has decided every rule, failure case and message, the user
+  may hand over only the typing ("you write the syntax") because they don't
+  remember an API (Zod, `node:crypto`, `pg`…). Type exactly the agreed
+  design, add no new behaviour, and raise any gap as a question instead of
+  deciding it. Log it in the phase file as "handed over (syntax): X,
+  revisit". Afterwards the user explains each line; Core code is still
+  rebuilt from a blank file before `/review`. It never applies before the
+  design is approved, or to the design itself.
 - **Problem before solution:** what breaks and why the naive version fails,
   before the production approach.
 - **Never commit.** Propose commit messages with no Claude attribution; the

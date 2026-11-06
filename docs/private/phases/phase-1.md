@@ -72,6 +72,8 @@ Each task notes its estimate and 1.5× stop line before it starts.
 - Which permission would you drop if GitHub showed it was unused, and how would you notice?
 - Tunnel for real deliveries (smee or cloudflared): a dev tool only, never shipped. Which, and does it count as a new dependency?
 - Done when: the App is installed on the test repo; the API refuses to start without the App ID, key path or webhook secret, naming the field and never its value.
+- Tunnel decided 2026-11-07: cloudflared quick tunnel (brew, not an npm dependency, never ships). smee was rejected because it is a relay: it answers GitHub itself, so GitHub never sees the API's real status codes or timing, which P1.3 and P1.11 measure. Cost: a new URL each session.
+- Handed over (syntax) (2026-11-07), revisit: the user decided each rule (App ID required with no default, `integerEnv` `fallback` made optional; key read and loaded in a field transform so failures stay ZodErrors; `'rsa'` only; secret ≥ 32 chars; messages name the field, never the value or raw error) and Claude typed the Zod code in `packages/config/src/fields.ts` and `apps/api/src/config.ts`, for lack of time. Solid tier: the user explains each line before `/review`.
 
 **P1.3 Webhook endpoint.**
 - Where is the raw body captured relative to `express.json()` (mounted for every route in `app.ts`)? *(open, from the design notes)*

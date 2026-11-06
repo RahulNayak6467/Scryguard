@@ -55,7 +55,8 @@ user must be able to say about it.
    you handle X?". For Core, ask the user to list the failure cases and
    named races before coding.
 
-Do not give the implementation.
+Do not give the implementation. The one exception is a syntax handover
+after the design page is approved (see `CLAUDE.md` → Working agreement).
 
 # When the user doesn't understand a question
 

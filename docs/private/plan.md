@@ -2,17 +2,18 @@
 
 ## Now
 
-Current phase: 1 · Vertical slice (P1.0 done)
-Status: behind 7 h · cuts: C1 (swapped for API keys) · 18 / 11 h · Hosted $0 / $10
-P1.0 done 2026-11-04: `/review fresh` of phase 0, 4 important found by the
-user; 3 fixed with tests (PRs #1, #2, 533 tests green), redaction moves
-to P1.6. [phases/phase-1.md](phases/phase-1.md) written.
-Next: Nov 5 reread phase 0 modules, 2 h cap, under P1.0: explain each one
-aloud without notes. Nov 6: permissions page and stolen-token case study,
-then P1.1. Follow-up: `tech-stack.md` drops Octokit for phase 1 (plain
-`fetch` + `node:crypto`), public commit. Drain delay deferred to phase 10.
-Risk: phase 1 must close at ≤ 27.5 h to avoid C2; 26 h left for 29 h of
-planned work, so 3 h must come from stop lines. Park side questions.
+Current phase: 1 · Vertical slice (P1.0, P1.1 done)
+Status: behind 7 h · cuts: C1 (swapped for API keys) · 21.5 / 14.5 h · Hosted $0 / $10
+P1.1 done 2026-11-07 except the Ollama `curl` check (GPU PC arrives Nov
+10; needed before P1.7). App on the personal account, installed on
+`scryguard-playground` only; config refuses bad GitHub settings (333
+tests). Tunnel: cloudflared quick tunnel (port 7844 blocked on home
+Wi-Fi; hotspot works); untick webhook Active after each session.
+Next: P1.2 break-first (15 min), then P1.3 readings (raw body, delivery
+behaviour, Stripe) and P1.3. Before `/review`: explain the syntax handover
+line by line; notes gaps (read access, events vs permissions, tunnel).
+Risk: phase 1 must close at ≤ 27.5 h; 22.5 h left for ~25.5 h of planned
+work, so ~3 h must come from stop lines. Park side questions.
 
 ## Phases
 
@@ -26,7 +27,7 @@ April, summer May 1–mid-July (15-day trip inside it).
 | # | Phase | T | B | Plan | Cum | Deadline | T act | B act | Status |
 |---|---|---:|---:|---:|---:|---|---:|---:|---|
 | 0 | Foundation | 2 | 8 | 10 | 10 | Nov 5 | 2 | 14.5 | done Nov 3 |
-| 1 | Vertical slice | 6 | 24 | 30 | 40 | Dec 2 | 0 | 1.5 | in progress |
+| 1 | Vertical slice | 6 | 24 | 30 | 40 | Dec 2 | 1.5 | 3.5 | in progress |
 | 2 | Control plane | 14 | 48 | 62 | 102 | Dec 14 | | | |
 | 3 | Reliable processing | 12 | 48 | 60 | 162 | Dec 29 | | | |
 | R1 | Review 1 | 3 | 3 | 6 | 168 | Dec 31 | | | |
@@ -260,3 +261,12 @@ to fail when the fix is reverted.
   fixes + `DATABASE_URL` param rule (shipped), config rule cleanup
   (handed over); statement timeout 15 → 5 s; PRs #1, #2 merged, 533
   tests · Hosted $0
+- 2026-11-07 · T 1.5 · B 2 · phase 0 reread; P1.1 readings (permissions,
+  stolen tokens, webhook signatures) + notes; GitHub App registered
+  (personal account, 5 permissions, key in `~/.config/scryguard`,
+  installed on `scryguard-playground`); design page; GitHub config
+  checked at startup (key loaded and RSA-checked in a Zod transform,
+  secret ≥ 32, App ID required; syntax handed over), `integerEnv`
+  fallback optional; `tester` +tests, 333 green; cloudflared tunnel,
+  ping round trip 404 in 0.83 s; Ollama check moved to Nov 10 ·
+  Hosted $0
