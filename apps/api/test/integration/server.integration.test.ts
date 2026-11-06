@@ -122,18 +122,54 @@ const waitUntilListening = async (api: ApiProcess): Promise<void> => {
     if (api.child.exitCode !== null) {
       throw new Error(`API exited with ${String(api.child.exitCode)} before listening`);
     }
-    if (await canConnect(api.port)) return;
-    await new Promise((wait) => setTimeout(wait, 100));
+    if (api.stdout().includes('"event":"server_listening"')) return;
+    await new Promise((wait) => setTimeout(wait, 50));
   }
   throw new Error(`API never listened on port ${String(api.port)}`);
 };
 
-const holdRequestOpen = async (port: number): Promise<Socket> => {
+const holdRequestOpen = async (port: number, requestLine = 'GET /health/live'): Promise<Socket> => {
+  const socket = connect(port, '127.0.0.1');
+  socket.on('error', () => undefined);
+  sockets.push(socket);
+  await once(socket, 'connect');
+  // Node sends 100 Continue only after parsing the headers, so the request is now in flight.
+  const continued = new Promise<void>((resolveContinue) => {
+    let received = '';
+    const onData = (chunk: Buffer): void => {
+      received += chunk.toString('utf8');
+      if (received.includes('\r\n\r\n')) {
+        socket.off('data', onData);
+        resolveContinue();
+      }
+    };
+    socket.on('data', onData);
+  });
+  socket.write(
+    `${requestLine} HTTP/1.1\r\nHost: localhost\r\nContent-Type: application/json\r\nContent-Length: 2\r\nExpect: 100-continue\r\n\r\n`,
+  );
+  await continued;
+  return socket;
+};
+
+const roundTrip = async (port: number): Promise<void> => {
+  const socket = connect(port, '127.0.0.1');
+  socket.on('error', () => undefined);
+  socket.resume();
+  const closed = new Promise((resolveClose) => socket.once('close', resolveClose));
+  await once(socket, 'connect');
+  socket.write('GET /health/live HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n');
+  await closed;
+};
+
+const openUnfinishedHeaders = async (port: number): Promise<Socket> => {
   const socket = connect(port, '127.0.0.1');
   socket.on('error', () => undefined);
   sockets.push(socket);
   await once(socket, 'connect');
   socket.write('GET /health/live HTTP/1.1\r\nHost: localhost\r\n');
+  // The server answers a later request only after reading these earlier bytes.
+  await roundTrip(port);
   return socket;
 };
 
@@ -204,7 +240,7 @@ describe('API process lifecycle', () => {
       SHUTDOWN_TIMEOUT_MS: '20000',
     });
     await waitUntilListening(api);
-    const held = await holdRequestOpen(api.port);
+    const held = await openUnfinishedHeaders(api.port);
     let response = '';
     held.on('data', (chunk: Buffer) => (response += chunk.toString('utf8')));
 
@@ -225,21 +261,14 @@ describe('API process lifecycle', () => {
       SHUTDOWN_TIMEOUT_MS: '20000',
     });
     await waitUntilListening(api);
-    const socket = connect(api.port, '127.0.0.1');
-    socket.on('error', () => undefined);
-    sockets.push(socket);
-    await once(socket, 'connect');
+    const socket = await holdRequestOpen(api.port, 'POST /slow');
     let response = '';
     socket.on('data', (chunk: Buffer) => (response += chunk.toString('utf8')));
-    socket.write(
-      'POST /slow HTTP/1.1\r\nHost: localhost\r\nContent-Type: application/json\r\nContent-Length: 2\r\n\r\n{',
-    );
-    await new Promise((wait) => setTimeout(wait, 200));
 
     api.child.kill('SIGTERM');
     await new Promise((wait) => setTimeout(wait, 200));
     const finishedAt = Date.now();
-    socket.write('}');
+    socket.write('{}');
 
     expect(await api.exited).toBe(0);
     expect(Date.now() - finishedAt).toBeLessThan(3_000);
