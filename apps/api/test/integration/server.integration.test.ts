@@ -3,7 +3,9 @@ import { once } from 'node:events';
 import { connect, createServer, type AddressInfo, type Socket } from 'node:net';
 import { resolve } from 'node:path';
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, describe, expect, it } from 'vitest';
+
+import { createGithubAppFixture, TEST_WEBHOOK_SECRET } from '../support/github-app.js';
 
 const apiRoot = resolve(import.meta.dirname, '../..');
 const LISTEN_DEADLINE_MS = 15_000;
@@ -18,6 +20,7 @@ const SHORT_SHUTDOWN_ENV = {
   DB_READINESS_TIMEOUT_MS: '500',
 };
 const STEP_ORDER = ['http_server', 'database', 'redis'];
+const githubApp = createGithubAppFixture();
 
 const requireEnv = (name: string): string => {
   const value = process.env[name];
@@ -55,7 +58,7 @@ interface ApiProcess {
 const running: ChildProcess[] = [];
 const sockets: Socket[] = [];
 
-const startApi = async (env: Record<string, string> = {}): Promise<ApiProcess> => {
+const startApi = async (env: Record<string, string | undefined> = {}): Promise<ApiProcess> => {
   const port = await findFreePort();
   let stdout = '';
   let stderr = '';
@@ -80,6 +83,7 @@ const startApi = async (env: Record<string, string> = {}): Promise<ApiProcess> =
         PORT: String(port),
         DATABASE_URL: requireEnv('TEST_DATABASE_URL'),
         REDIS_URL: requireEnv('TEST_REDIS_URL'),
+        ...githubApp.env,
         ...env,
       },
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -148,6 +152,10 @@ describe('API process lifecycle', () => {
     for (const child of running.splice(0)) {
       if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
     }
+  });
+
+  afterAll(() => {
+    githubApp.cleanup();
   });
 
   it.each(['SIGTERM', 'SIGINT'] as const)(
@@ -337,6 +345,31 @@ describe('API process lifecycle', () => {
     expect(await api.exited).toBe(1);
     expect(stepsDone(api)).toEqual(STEP_ORDER);
     expect(eventsNamed(api, 'shutdown_deadline_exceeded')).toEqual([]);
+  });
+
+  it.each(['GITHUB_APP_ID', 'GITHUB_APP_WEBHOOK_SECRET', 'GITHUB_APP_PRIVATE_KEY_PATH'] as const)(
+    'refuses to start without %s, naming it as required',
+    async (field) => {
+      const api = await startApi({ [field]: undefined });
+
+      expect(await api.exited).toBe(1);
+      expect(api.stderr()).toContain('"event":"config_invalid"');
+      expect(api.stderr()).toContain(`{"field":"${field}","reason":"${field} is required"}`);
+      expect(await canConnect(api.port)).toBe(false);
+    },
+  );
+
+  it('refuses to start with an unreadable key file, never printing the key path or the webhook secret', async () => {
+    const missingKeyPath = resolve(githubApp.dir, 'missing.pem');
+    const api = await startApi({ GITHUB_APP_PRIVATE_KEY_PATH: missingKeyPath });
+
+    expect(await api.exited).toBe(1);
+    expect(api.stderr()).toContain(
+      '{"field":"GITHUB_APP_PRIVATE_KEY_PATH","reason":"GITHUB_APP_PRIVATE_KEY_PATH could not be read"}',
+    );
+    for (const forbidden of [missingKeyPath, githubApp.dir, TEST_WEBHOOK_SECRET, 'ENOENT']) {
+      expect(api.stderr() + api.stdout()).not.toContain(forbidden);
+    }
   });
 
   it('refuses to start on invalid config, naming the field but never its value', async () => {

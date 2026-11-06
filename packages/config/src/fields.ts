@@ -3,7 +3,7 @@ import * as z from 'zod';
 interface IntegerEnvOptions {
   readonly min: number;
   readonly max: number;
-  readonly fallback: number;
+  readonly fallback?: number;
   readonly unit?: string;
 }
 
@@ -16,10 +16,13 @@ export const integerEnv = (field: string, { min, max, fallback, unit }: IntegerE
     : `${field} must be a whole number`;
   const suffix = unit ? ` ${unit}` : '';
 
-  return z
-    .string({ error: wholeNumber })
-    .regex(/^\d+$/u, { error: wholeNumber })
-    .default(String(fallback))
+  const digits = z
+    .string({
+      error: (issue) => (issue.input === undefined ? `${field} is required` : wholeNumber),
+    })
+    .regex(/^\d+$/u, { error: wholeNumber });
+
+  return (fallback === undefined ? digits : digits.default(String(fallback)))
     .transform(Number)
     .pipe(
       z

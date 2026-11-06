@@ -46,11 +46,37 @@ describe('integerEnv', () => {
     },
   );
 
+  it('never reports a missing value as required when a fallback is set', () => {
+    expect(messages(schema, undefined)).toEqual([]);
+    expect(messages(schema, null)).toEqual(['TIMEOUT_MS must be a whole number of milliseconds']);
+  });
+
   it('leaves the unit out of the message when none is given', () => {
     const port = integerEnv('PORT', { min: 1, max: 65_535, fallback: 8000 });
 
     expect(messages(port, 'abc')).toEqual(['PORT must be a whole number']);
     expect(messages(port, '0')).toEqual(['PORT must be at least 1']);
+  });
+
+  describe('without a fallback', () => {
+    const appId = integerEnv('APP_ID', { min: 1, max: 1_000 });
+
+    it('rejects a missing value as required', () => {
+      expect(messages(appId, undefined)).toEqual(['APP_ID is required']);
+    });
+
+    it.each([
+      ['', 'APP_ID must be a whole number'],
+      ['abc', 'APP_ID must be a whole number'],
+      ['0', 'APP_ID must be at least 1'],
+      ['1001', 'APP_ID must not exceed 1,000'],
+    ])('rejects %j with its usual message', (value, message) => {
+      expect(messages(appId, value)).toEqual([message]);
+    });
+
+    it('converts a digit string into a number', () => {
+      expect(appId.parse('42')).toBe(42);
+    });
   });
 });
 
