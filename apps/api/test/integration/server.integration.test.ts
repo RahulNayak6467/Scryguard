@@ -261,7 +261,8 @@ describe('API process lifecycle', () => {
     const api = await startApi(SHORT_SHUTDOWN_ENV);
     await waitUntilListening(api);
     const held = await holdRequestOpen(api.port);
-    const heldClosed = once(held, 'close');
+    // events.once would reject: a cut socket can emit ECONNRESET before 'close'.
+    const heldClosed = new Promise((closed) => held.once('close', closed));
     const startedAt = Date.now();
 
     api.child.kill('SIGTERM');
