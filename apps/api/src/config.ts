@@ -9,6 +9,8 @@ import {
 } from '@scryguard/config';
 import { QUERY_TIMEOUT_MARGIN_MS } from '@scryguard/database';
 import { QUIT_TIMEOUT_MS } from '@scryguard/redis';
+import { createPrivateKey, type KeyObject } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import * as z from 'zod';
 
 export const SHUTDOWN_MARGIN_MS = QUERY_TIMEOUT_MARGIN_MS + QUIT_TIMEOUT_MS;
@@ -59,6 +61,42 @@ const serverEnvSchema = z.object({
   }),
 });
 
+const githubEnvSchema = z.object({
+  GITHUB_APP_ID: integerEnv('GITHUB_APP_ID', { min: 1, max: Number.MAX_SAFE_INTEGER }),
+  GITHUB_APP_WEBHOOK_SECRET: z
+    .string({ error: 'GITHUB_APP_WEBHOOK_SECRET is required' })
+    .min(32, { error: 'GITHUB_APP_WEBHOOK_SECRET must be at least 32 characters' }),
+  GITHUB_APP_PRIVATE_KEY_PATH: z
+    .string({ error: 'GITHUB_APP_PRIVATE_KEY_PATH is required' })
+    .min(1, { error: 'GITHUB_APP_PRIVATE_KEY_PATH is required', abort: true })
+    .transform((path, context): KeyObject => {
+      const fail = (message: string): never => {
+        context.addIssue({ code: 'custom', message });
+        return z.NEVER;
+      };
+
+      let pem: string;
+      try {
+        pem = readFileSync(path, 'utf8');
+      } catch {
+        return fail('GITHUB_APP_PRIVATE_KEY_PATH could not be read');
+      }
+
+      let key: KeyObject;
+      try {
+        key = createPrivateKey(pem);
+      } catch {
+        return fail('GITHUB_APP_PRIVATE_KEY_PATH is not a valid private key');
+      }
+
+      if (key.asymmetricKeyType !== 'rsa') {
+        return fail('GITHUB_APP_PRIVATE_KEY_PATH is not an RSA private key');
+      }
+
+      return key;
+    }),
+});
+
 export const apiEnvSchema = z
   .object({
     ...environmentEnvSchema.shape,
@@ -66,6 +104,7 @@ export const apiEnvSchema = z
     ...serverEnvSchema.shape,
     ...databaseEnvSchema.shape,
     ...redisEnvSchema.shape,
+    ...githubEnvSchema.shape,
   })
   .superRefine((env, context) => {
     applyLoggerRules(env, context);
@@ -129,6 +168,11 @@ export const apiEnvSchema = z
         url: env.REDIS_URL,
         commandTimeoutMs: env.REDIS_COMMAND_TIMEOUT_MS,
         connectTimeoutMs: env.REDIS_CONNECT_TIMEOUT_MS,
+      }),
+      github: Object.freeze({
+        appId: env.GITHUB_APP_ID,
+        webhookSecret: env.GITHUB_APP_WEBHOOK_SECRET,
+        privateKey: env.GITHUB_APP_PRIVATE_KEY_PATH,
       }),
     }),
   );

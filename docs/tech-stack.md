@@ -8,7 +8,7 @@ Update this page in the same PR when you add or remove a dependency.
 |---|---|---|
 | Runtime | Node.js 24, TypeScript (strict), pnpm workspaces | One language for the API, workers and tooling; one codebase, several processes ([0004](adr/0004-modular-monolith-in-a-monorepo.md)) |
 | API | Express 5, Zod | Small and familiar; Zod validates every input and LLM output |
-| GitHub | GitHub App, Octokit | Webhooks, installation tokens, Checks API |
+| GitHub | GitHub App; REST through `fetch`, app JWT signed with `node:crypto` | Webhooks, installation tokens, Checks API; token handling kept explicit and easy to fake in tests |
 | Database | PostgreSQL 18 + pgvector | Source of truth, plus vector and full-text search in one place ([0001](adr/0001-postgresql-as-source-of-truth.md)) |
 | Cache | Redis | Caching, rate limits and live-update fan-out; nothing that can't be lost ([0001](adr/0001-postgresql-as-source-of-truth.md)) |
 | Queue | Amazon SQS + DLQ | At-least-once delivery with visibility timeouts and redrive ([0002](adr/0002-sqs-for-review-jobs.md)) |

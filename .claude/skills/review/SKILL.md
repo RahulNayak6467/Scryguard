@@ -44,8 +44,13 @@ List 3–6 edge cases as questions, most severe first, no answers:
 1. [twice] SQS delivers the same review message to two workers: what does your code do?
 ```
 
-Take them one at a time. The user walks through their code; if stuck, give
-the next rung only (sharper question → principle → pattern in words). When
+Each question is a concrete situation in Scryguard's own flow, with the
+file and line to look at. Take them one at a time. The user walks through
+their code; if stuck, give the next rung only (sharper question →
+principle → pattern in words). On "didn't understand", "simpler",
+"example" or "hint", go one level down without the answer: one idea in
+one sentence → an everyday picture → the line to look at → split into two
+easier questions. When
 they propose a fix, push on the next case it creates. Cases they find count
 as theirs.
 

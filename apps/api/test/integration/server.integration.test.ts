@@ -3,7 +3,9 @@ import { once } from 'node:events';
 import { connect, createServer, type AddressInfo, type Socket } from 'node:net';
 import { resolve } from 'node:path';
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, describe, expect, it } from 'vitest';
+
+import { createGithubAppFixture, TEST_WEBHOOK_SECRET } from '../support/github-app.js';
 
 const apiRoot = resolve(import.meta.dirname, '../..');
 const LISTEN_DEADLINE_MS = 15_000;
@@ -18,6 +20,7 @@ const SHORT_SHUTDOWN_ENV = {
   DB_READINESS_TIMEOUT_MS: '500',
 };
 const STEP_ORDER = ['http_server', 'database', 'redis'];
+const githubApp = createGithubAppFixture();
 
 const requireEnv = (name: string): string => {
   const value = process.env[name];
@@ -55,7 +58,7 @@ interface ApiProcess {
 const running: ChildProcess[] = [];
 const sockets: Socket[] = [];
 
-const startApi = async (env: Record<string, string> = {}): Promise<ApiProcess> => {
+const startApi = async (env: Record<string, string | undefined> = {}): Promise<ApiProcess> => {
   const port = await findFreePort();
   let stdout = '';
   let stderr = '';
@@ -80,6 +83,7 @@ const startApi = async (env: Record<string, string> = {}): Promise<ApiProcess> =
         PORT: String(port),
         DATABASE_URL: requireEnv('TEST_DATABASE_URL'),
         REDIS_URL: requireEnv('TEST_REDIS_URL'),
+        ...githubApp.env,
         ...env,
       },
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -118,18 +122,54 @@ const waitUntilListening = async (api: ApiProcess): Promise<void> => {
     if (api.child.exitCode !== null) {
       throw new Error(`API exited with ${String(api.child.exitCode)} before listening`);
     }
-    if (await canConnect(api.port)) return;
-    await new Promise((wait) => setTimeout(wait, 100));
+    if (api.stdout().includes('"event":"server_listening"')) return;
+    await new Promise((wait) => setTimeout(wait, 50));
   }
   throw new Error(`API never listened on port ${String(api.port)}`);
 };
 
-const holdRequestOpen = async (port: number): Promise<Socket> => {
+const holdRequestOpen = async (port: number, requestLine = 'GET /health/live'): Promise<Socket> => {
+  const socket = connect(port, '127.0.0.1');
+  socket.on('error', () => undefined);
+  sockets.push(socket);
+  await once(socket, 'connect');
+  // Node sends 100 Continue only after parsing the headers, so the request is now in flight.
+  const continued = new Promise<void>((resolveContinue) => {
+    let received = '';
+    const onData = (chunk: Buffer): void => {
+      received += chunk.toString('utf8');
+      if (received.includes('\r\n\r\n')) {
+        socket.off('data', onData);
+        resolveContinue();
+      }
+    };
+    socket.on('data', onData);
+  });
+  socket.write(
+    `${requestLine} HTTP/1.1\r\nHost: localhost\r\nContent-Type: application/json\r\nContent-Length: 2\r\nExpect: 100-continue\r\n\r\n`,
+  );
+  await continued;
+  return socket;
+};
+
+const roundTrip = async (port: number): Promise<void> => {
+  const socket = connect(port, '127.0.0.1');
+  socket.on('error', () => undefined);
+  socket.resume();
+  const closed = new Promise((resolveClose) => socket.once('close', resolveClose));
+  await once(socket, 'connect');
+  socket.write('GET /health/live HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n');
+  await closed;
+};
+
+const openUnfinishedHeaders = async (port: number): Promise<Socket> => {
   const socket = connect(port, '127.0.0.1');
   socket.on('error', () => undefined);
   sockets.push(socket);
   await once(socket, 'connect');
   socket.write('GET /health/live HTTP/1.1\r\nHost: localhost\r\n');
+  // The server answers a later request only after reading these earlier bytes.
+  await roundTrip(port);
   return socket;
 };
 
@@ -148,6 +188,10 @@ describe('API process lifecycle', () => {
     for (const child of running.splice(0)) {
       if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
     }
+  });
+
+  afterAll(() => {
+    githubApp.cleanup();
   });
 
   it.each(['SIGTERM', 'SIGINT'] as const)(
@@ -196,7 +240,7 @@ describe('API process lifecycle', () => {
       SHUTDOWN_TIMEOUT_MS: '20000',
     });
     await waitUntilListening(api);
-    const held = await holdRequestOpen(api.port);
+    const held = await openUnfinishedHeaders(api.port);
     let response = '';
     held.on('data', (chunk: Buffer) => (response += chunk.toString('utf8')));
 
@@ -217,21 +261,14 @@ describe('API process lifecycle', () => {
       SHUTDOWN_TIMEOUT_MS: '20000',
     });
     await waitUntilListening(api);
-    const socket = connect(api.port, '127.0.0.1');
-    socket.on('error', () => undefined);
-    sockets.push(socket);
-    await once(socket, 'connect');
+    const socket = await holdRequestOpen(api.port, 'POST /slow');
     let response = '';
     socket.on('data', (chunk: Buffer) => (response += chunk.toString('utf8')));
-    socket.write(
-      'POST /slow HTTP/1.1\r\nHost: localhost\r\nContent-Type: application/json\r\nContent-Length: 2\r\n\r\n{',
-    );
-    await new Promise((wait) => setTimeout(wait, 200));
 
     api.child.kill('SIGTERM');
     await new Promise((wait) => setTimeout(wait, 200));
     const finishedAt = Date.now();
-    socket.write('}');
+    socket.write('{}');
 
     expect(await api.exited).toBe(0);
     expect(Date.now() - finishedAt).toBeLessThan(3_000);
@@ -253,7 +290,8 @@ describe('API process lifecycle', () => {
     const api = await startApi(SHORT_SHUTDOWN_ENV);
     await waitUntilListening(api);
     const held = await holdRequestOpen(api.port);
-    const heldClosed = once(held, 'close');
+    // events.once would reject: a cut socket can emit ECONNRESET before 'close'.
+    const heldClosed = new Promise((closed) => held.once('close', closed));
     const startedAt = Date.now();
 
     api.child.kill('SIGTERM');
@@ -337,6 +375,31 @@ describe('API process lifecycle', () => {
     expect(await api.exited).toBe(1);
     expect(stepsDone(api)).toEqual(STEP_ORDER);
     expect(eventsNamed(api, 'shutdown_deadline_exceeded')).toEqual([]);
+  });
+
+  it.each(['GITHUB_APP_ID', 'GITHUB_APP_WEBHOOK_SECRET', 'GITHUB_APP_PRIVATE_KEY_PATH'] as const)(
+    'refuses to start without %s, naming it as required',
+    async (field) => {
+      const api = await startApi({ [field]: undefined });
+
+      expect(await api.exited).toBe(1);
+      expect(api.stderr()).toContain('"event":"config_invalid"');
+      expect(api.stderr()).toContain(`{"field":"${field}","reason":"${field} is required"}`);
+      expect(await canConnect(api.port)).toBe(false);
+    },
+  );
+
+  it('refuses to start with an unreadable key file, never printing the key path or the webhook secret', async () => {
+    const missingKeyPath = resolve(githubApp.dir, 'missing.pem');
+    const api = await startApi({ GITHUB_APP_PRIVATE_KEY_PATH: missingKeyPath });
+
+    expect(await api.exited).toBe(1);
+    expect(api.stderr()).toContain(
+      '{"field":"GITHUB_APP_PRIVATE_KEY_PATH","reason":"GITHUB_APP_PRIVATE_KEY_PATH could not be read"}',
+    );
+    for (const forbidden of [missingKeyPath, githubApp.dir, TEST_WEBHOOK_SECRET, 'ENOENT']) {
+      expect(api.stderr() + api.stdout()).not.toContain(forbidden);
+    }
   });
 
   it('refuses to start on invalid config, naming the field but never its value', async () => {

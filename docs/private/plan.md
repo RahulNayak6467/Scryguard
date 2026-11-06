@@ -2,22 +2,18 @@
 
 ## Now
 
-Current phase: 1 · Vertical slice (not started)
-Status: behind 6.5 h · cuts: C1 (swapped for API keys) · 16.5 / 10 h · Hosted $0 / $10
-Phase 0 done 2026-11-03 (16.5 h of 10): CI green, 493 tests, ADR 0009
-accepted, README Getting started verified on a clean clone.
-Next: Nov 4 finish `fix/shutdown-budget` (format, three small fixes in
-`shutdown.ts`, part 3: generic 5xx body) and merge both PRs. Nov 5 reread
-phase 0 modules, 2 h cap, logged under P1.0: explain each one aloud
-without notes. Nov 6 phase 1 starts with the permissions page and the
-stolen-token case study before P1.1
-([phases/phase-1.md](phases/phase-1.md)). Follow-up: `tech-stack.md` drops
-Octokit for phase 1 (plain `fetch` + `node:crypto`), in a public commit.
-Carried over: `/review fresh` of phase 0 was not run, so run it before
-phase 1's first build step. Revisit the handed-over redaction and
-keep-alive drain fix. Drain delay deferred to phase 10.
-Risk: phase 1 starts 6.5 h behind; its end is the first checkpoint
-(actual ÷ plan > 1.10 → C2). One branch and PR per feature from now on.
+Current phase: 1 · Vertical slice (P1.0, P1.1 done)
+Status: behind 7 h · cuts: C1 (swapped for API keys) · 21.5 / 14.5 h · Hosted $0 / $10
+P1.1 done 2026-11-07 except the Ollama `curl` check (GPU PC arrives Nov
+10; needed before P1.7). App on the personal account, installed on
+`scryguard-playground` only; config refuses bad GitHub settings (333
+tests). Tunnel: cloudflared quick tunnel (port 7844 blocked on home
+Wi-Fi; hotspot works); untick webhook Active after each session.
+Next: P1.2 break-first (15 min), then P1.3 readings (raw body, delivery
+behaviour, Stripe) and P1.3. Before `/review`: explain the syntax handover
+line by line; notes gaps (read access, events vs permissions, tunnel).
+Risk: phase 1 must close at ≤ 27.5 h; 22.5 h left for ~25.5 h of planned
+work, so ~3 h must come from stop lines. Park side questions.
 
 ## Phases
 
@@ -31,7 +27,7 @@ April, summer May 1–mid-July (15-day trip inside it).
 | # | Phase | T | B | Plan | Cum | Deadline | T act | B act | Status |
 |---|---|---:|---:|---:|---:|---|---:|---:|---|
 | 0 | Foundation | 2 | 8 | 10 | 10 | Nov 5 | 2 | 14.5 | done Nov 3 |
-| 1 | Vertical slice | 6 | 24 | 30 | 40 | Dec 2 | | | |
+| 1 | Vertical slice | 6 | 24 | 30 | 40 | Dec 2 | 1.5 | 3.5 | in progress |
 | 2 | Control plane | 14 | 48 | 62 | 102 | Dec 14 | | | |
 | 3 | Reliable processing | 12 | 48 | 60 | 162 | Dec 29 | | | |
 | R1 | Review 1 | 3 | 3 | 6 | 168 | Dec 31 | | | |
@@ -259,3 +255,18 @@ to fail when the fix is reverted.
   hang ended by query_timeout, never the deadline) → drain fix + config
   rule (handed over); P0.9 local checks pass; ADR 0009 accepted; CI
   green; phase 0 closed, README Getting started + badge · Hosted $0
+- 2026-11-04 · T 0 · B 1.5 · phase 1 plan written; P1.0 `/review fresh`
+  of phase 0: 4 important (all found by the user), 16 small; fixed HTTP
+  drain budget, armed unref'd deadline, generic 5xx body (user), small
+  fixes + `DATABASE_URL` param rule (shipped), config rule cleanup
+  (handed over); statement timeout 15 → 5 s; PRs #1, #2 merged, 533
+  tests · Hosted $0
+- 2026-11-07 · T 1.5 · B 2 · phase 0 reread; P1.1 readings (permissions,
+  stolen tokens, webhook signatures) + notes; GitHub App registered
+  (personal account, 5 permissions, key in `~/.config/scryguard`,
+  installed on `scryguard-playground`); design page; GitHub config
+  checked at startup (key loaded and RSA-checked in a Zod transform,
+  secret ≥ 32, App ID required; syntax handed over), `integerEnv`
+  fallback optional; `tester` +tests, 333 green; cloudflared tunnel,
+  ping round trip 404 in 0.83 s; Ollama check moved to Nov 10 ·
+  Hosted $0

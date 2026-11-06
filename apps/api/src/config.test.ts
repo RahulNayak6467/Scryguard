@@ -1,18 +1,37 @@
 import { QUERY_TIMEOUT_MARGIN_MS } from '@scryguard/database';
 import { QUIT_TIMEOUT_MS } from '@scryguard/redis';
-import { describe, expect, it, vi } from 'vitest';
+import { generateKeyPairSync, KeyObject } from 'node:crypto';
+import { join } from 'node:path';
+
+import { afterAll, describe, expect, it, vi } from 'vitest';
 import * as z from 'zod';
 
+import { createGithubAppFixture, TEST_WEBHOOK_SECRET } from '../test/support/github-app.js';
 import { apiEnvSchema, loadConfig, parseConfig, SHUTDOWN_MARGIN_MS } from './config.js';
 
 const databaseUrl = 'postgres://scryguard_test:test-only@127.0.0.1:5461/scryguard_test';
 const redisUrl = 'redis://default:test-only@127.0.0.1:6411/0';
 
+const githubApp = createGithubAppFixture();
+
+afterAll(() => {
+  githubApp.cleanup();
+});
+
 const requiredInput = {
   NODE_ENV: 'development',
   DATABASE_URL: databaseUrl,
   REDIS_URL: redisUrl,
+  ...githubApp.env,
 } as const;
+
+const anyKeyObject: unknown = expect.any(KeyObject);
+
+const expectedGithub = {
+  appId: 123_456,
+  webhookSecret: TEST_WEBHOOK_SECRET,
+  privateKey: anyKeyObject,
+};
 
 const expectedDefaults = {
   environment: 'development',
@@ -34,6 +53,7 @@ const expectedDefaults = {
     readinessTimeoutMs: 1_000,
   },
   redis: { url: redisUrl, commandTimeoutMs: 100, connectTimeoutMs: 2_000 },
+  github: expectedGithub,
 } as const;
 
 const explicitInput = {
@@ -76,6 +96,7 @@ const expectedExplicit = {
     readinessTimeoutMs: 750,
   },
   redis: { url: redisUrl, commandTimeoutMs: 250, connectTimeoutMs: 4_000 },
+  github: expectedGithub,
 } as const;
 
 const failingFields = (input: Record<string, string>): string[] => {
@@ -97,12 +118,15 @@ describe('API configuration', () => {
     expect(parseConfig(explicitInput)).toEqual(expectedExplicit);
   });
 
-  it('requires NODE_ENV, DATABASE_URL and REDIS_URL', () => {
+  it('requires NODE_ENV, DATABASE_URL, REDIS_URL and the three GitHub App settings', () => {
     const result = apiEnvSchema.safeParse({});
 
     expect(result.success).toBe(false);
     expect(result.error?.issues.map((issue) => issue.path.join('.')).sort()).toEqual([
       'DATABASE_URL',
+      'GITHUB_APP_ID',
+      'GITHUB_APP_PRIVATE_KEY_PATH',
+      'GITHUB_APP_WEBHOOK_SECRET',
       'NODE_ENV',
       'REDIS_URL',
     ]);
@@ -325,7 +349,13 @@ describe('API configuration', () => {
     const config = parseConfig(requiredInput);
 
     expect(Object.isFrozen(config)).toBe(true);
-    for (const section of [config.logging, config.server, config.database, config.redis]) {
+    for (const section of [
+      config.logging,
+      config.server,
+      config.database,
+      config.redis,
+      config.github,
+    ]) {
       expect(Object.isFrozen(section)).toBe(true);
     }
   });
@@ -344,5 +374,169 @@ describe('API configuration', () => {
 
     vi.stubEnv('PORT', '70000');
     expect(() => loadConfig()).toThrow(z.ZodError);
+  });
+});
+
+describe('API configuration: GitHub App settings', () => {
+  const githubIssues = (overrides: Record<string, string | undefined>) => {
+    const result = apiEnvSchema.safeParse({ ...requiredInput, ...overrides });
+    return result.success
+      ? []
+      : result.error.issues.map((issue) => ({
+          path: issue.path.join('.'),
+          message: issue.message,
+        }));
+  };
+
+  const keyPathIssues = (path: string) => githubIssues({ GITHUB_APP_PRIVATE_KEY_PATH: path });
+
+  const ed25519Pem = (): string =>
+    generateKeyPairSync('ed25519').privateKey.export({ type: 'pkcs8', format: 'pem' }).toString();
+
+  it.each(['GITHUB_APP_ID', 'GITHUB_APP_WEBHOOK_SECRET', 'GITHUB_APP_PRIVATE_KEY_PATH'] as const)(
+    'reports %s as required when it is not set',
+    (field) => {
+      expect(githubIssues({ [field]: undefined })).toEqual([
+        { path: field, message: `${field} is required` },
+      ]);
+    },
+  );
+
+  it('reports an empty GITHUB_APP_PRIVATE_KEY_PATH as required', () => {
+    expect(keyPathIssues('')).toEqual([
+      { path: 'GITHUB_APP_PRIVATE_KEY_PATH', message: 'GITHUB_APP_PRIVATE_KEY_PATH is required' },
+    ]);
+  });
+
+  it.each([
+    ['abc', 'GITHUB_APP_ID must be a whole number'],
+    ['0', 'GITHUB_APP_ID must be at least 1'],
+  ])('rejects GITHUB_APP_ID=%j', (appId, message) => {
+    expect(githubIssues({ GITHUB_APP_ID: appId })).toEqual([{ path: 'GITHUB_APP_ID', message }]);
+  });
+
+  it('accepts GITHUB_APP_ID=1 as the smallest App ID', () => {
+    expect(parseConfig({ ...requiredInput, GITHUB_APP_ID: '1' }).github.appId).toBe(1);
+  });
+
+  it('accepts the largest safe integer as GITHUB_APP_ID and rejects one above it', () => {
+    expect(parseConfig({ ...requiredInput, GITHUB_APP_ID: '9007199254740991' }).github.appId).toBe(
+      Number.MAX_SAFE_INTEGER,
+    );
+    expect(githubIssues({ GITHUB_APP_ID: '9007199254740992' })).toEqual([
+      {
+        path: 'GITHUB_APP_ID',
+        message: 'GITHUB_APP_ID must not exceed 9,007,199,254,740,991',
+      },
+    ]);
+  });
+
+  it('reports a key file that does not exist as unreadable', () => {
+    expect(keyPathIssues(join(githubApp.dir, 'missing.pem'))).toEqual([
+      {
+        path: 'GITHUB_APP_PRIVATE_KEY_PATH',
+        message: 'GITHUB_APP_PRIVATE_KEY_PATH could not be read',
+      },
+    ]);
+  });
+
+  it('reports a key path that points at a directory as unreadable', () => {
+    expect(keyPathIssues(githubApp.dir)).toEqual([
+      {
+        path: 'GITHUB_APP_PRIVATE_KEY_PATH',
+        message: 'GITHUB_APP_PRIVATE_KEY_PATH could not be read',
+      },
+    ]);
+  });
+
+  it.each([
+    ['empty', ''],
+    ['garbage', 'garbage-key-content not a pem\n'],
+  ])('reports a key file with %s content as not a valid private key', (name, content) => {
+    expect(keyPathIssues(githubApp.writeFile(`${name}.pem`, content))).toEqual([
+      {
+        path: 'GITHUB_APP_PRIVATE_KEY_PATH',
+        message: 'GITHUB_APP_PRIVATE_KEY_PATH is not a valid private key',
+      },
+    ]);
+  });
+
+  it('reports a valid Ed25519 private key as not an RSA private key', () => {
+    expect(keyPathIssues(githubApp.writeFile('ed25519.pem', ed25519Pem()))).toEqual([
+      {
+        path: 'GITHUB_APP_PRIVATE_KEY_PATH',
+        message: 'GITHUB_APP_PRIVATE_KEY_PATH is not an RSA private key',
+      },
+    ]);
+  });
+
+  it('rejects a 31-character webhook secret and accepts exactly 32 characters', () => {
+    expect(githubIssues({ GITHUB_APP_WEBHOOK_SECRET: 's'.repeat(31) })).toEqual([
+      {
+        path: 'GITHUB_APP_WEBHOOK_SECRET',
+        message: 'GITHUB_APP_WEBHOOK_SECRET must be at least 32 characters',
+      },
+    ]);
+    expect(githubIssues({ GITHUB_APP_WEBHOOK_SECRET: 's'.repeat(32) })).toEqual([]);
+  });
+
+  it('outputs the App ID as a number, the secret and the loaded RSA private key', () => {
+    const { github } = parseConfig(requiredInput);
+
+    expect(github.appId).toBe(123_456);
+    expect(github.webhookSecret).toBe(TEST_WEBHOOK_SECRET);
+    expect(github.privateKey).toBeInstanceOf(KeyObject);
+    expect(github.privateKey.type).toBe('private');
+    expect(github.privateKey.asymmetricKeyType).toBe('rsa');
+    expect(github.privateKey.equals(githubApp.privateKey)).toBe(true);
+  });
+
+  it('accepts an RSA private key exported as PKCS#8 PEM', () => {
+    const pkcs8Pem = githubApp.privateKey.export({ type: 'pkcs8', format: 'pem' }).toString();
+    const keyPath = githubApp.writeFile('pkcs8.pem', pkcs8Pem);
+
+    const { github } = parseConfig({ ...requiredInput, GITHUB_APP_PRIVATE_KEY_PATH: keyPath });
+
+    expect(pkcs8Pem.startsWith('-----BEGIN PRIVATE KEY-----')).toBe(true);
+    expect(github.privateKey).toBeInstanceOf(KeyObject);
+    expect(github.privateKey.asymmetricKeyType).toBe('rsa');
+    expect(github.privateKey.equals(githubApp.privateKey)).toBe(true);
+  });
+
+  it('never puts the key path, the key content, the secret or the raw Node error in an issue', () => {
+    const shortSecret = 'short-secret-value-0123456789ab';
+    const failing = [
+      { GITHUB_APP_WEBHOOK_SECRET: shortSecret },
+      { GITHUB_APP_PRIVATE_KEY_PATH: join(githubApp.dir, 'missing.pem') },
+      { GITHUB_APP_PRIVATE_KEY_PATH: githubApp.dir },
+      { GITHUB_APP_PRIVATE_KEY_PATH: githubApp.writeFile('empty-leak.pem', '') },
+      {
+        GITHUB_APP_PRIVATE_KEY_PATH: githubApp.writeFile(
+          'garbage-leak.pem',
+          'garbage-key-content not a pem\n',
+        ),
+      },
+      { GITHUB_APP_PRIVATE_KEY_PATH: githubApp.writeFile('ed25519-leak.pem', ed25519Pem()) },
+    ];
+
+    for (const overrides of failing) {
+      const result = apiEnvSchema.safeParse({ ...requiredInput, ...overrides });
+
+      expect(result.success).toBe(false);
+      const reported = `${JSON.stringify(result.error?.issues)}\n${result.error?.message ?? ''}`;
+      for (const forbidden of [
+        githubApp.dir,
+        shortSecret,
+        'garbage-key-content',
+        'PRIVATE KEY',
+        'ENOENT',
+        'EISDIR',
+        'no such file',
+        'DECODER',
+        'error:',
+      ]) {
+        expect(reported).not.toContain(forbidden);
+      }
+    }
   });
 });
