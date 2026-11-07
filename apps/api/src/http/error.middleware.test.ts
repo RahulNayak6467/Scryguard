@@ -63,6 +63,7 @@ describe('error middleware', () => {
       ['invalid_input', 400],
       ['not_found', 404],
       ['payload_too_large', 413],
+      ['unauthenticated', 401],
     ] satisfies [ErrorKind, number][])(
       'maps kind %s to status %i with retryable taken from the kind',
       async (kind, status) => {

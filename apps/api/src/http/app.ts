@@ -8,6 +8,7 @@ import { createErrorMiddleware } from './error.middleware.js';
 import { createBodyLimitMiddleware, notFoundMiddleware } from './helper-error.middleware.js';
 import { createRequestIdMiddleware } from './request-id.middleware.js';
 import { createRequestLoggerMiddleware } from './request-logger.middleware.js';
+import { createWebhooksRoutes } from '../webhooks/webhooks.routes.js';
 
 export const MAX_REQUEST_BODY_BYTES = 1_048_576;
 
@@ -16,6 +17,7 @@ export interface AppDependencies {
   readonly clock: Clock;
   readonly checkReadiness: ReadinessChecker;
   readonly isDraining: () => boolean;
+  readonly webhookSecret: string;
 }
 
 export const createApp = ({
@@ -23,6 +25,7 @@ export const createApp = ({
   clock,
   checkReadiness,
   isDraining,
+  webhookSecret,
 }: AppDependencies): Express => {
   const app = express();
   app.disable('x-powered-by');
@@ -48,8 +51,8 @@ export const createApp = ({
   app.use(createRequestIdMiddleware(logger));
   app.use(createRequestLoggerMiddleware(clock, { quietPaths: ['/health/live', '/health/ready'] }));
   app.use(createBodyLimitMiddleware(MAX_REQUEST_BODY_BYTES));
+  app.use('/webhooks/github', createWebhooksRoutes(webhookSecret, MAX_REQUEST_BODY_BYTES));
   app.use(express.json({ limit: MAX_REQUEST_BODY_BYTES }));
-
   app.use('/health', createHealthRoutes(checkReadiness));
 
   app.use(notFoundMiddleware);

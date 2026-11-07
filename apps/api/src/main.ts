@@ -62,7 +62,8 @@ const checkReadiness = createReadinessChecker({
   logger,
 });
 
-const app = createApp({ logger, clock: systemClock, checkReadiness, isDraining });
+const webhookSecret = config.github.webhookSecret;
+const app = createApp({ logger, clock: systemClock, checkReadiness, isDraining, webhookSecret });
 
 const server = createServer({ connectionsCheckingInterval: CONNECTIONS_CHECK_INTERVAL_MS }, app);
 server.requestTimeout = config.server.requestTimeoutMs;

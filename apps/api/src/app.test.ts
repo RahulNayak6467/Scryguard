@@ -16,7 +16,13 @@ const draining: ReadinessChecker = () =>
   Promise.resolve({ status: 'not_ready', reason: 'draining' });
 
 const createTestApp = (checkReadiness: ReadinessChecker = ready, isDraining = () => false) =>
-  createApp({ logger: silentLogger(), clock: systemClock, checkReadiness, isDraining });
+  createApp({
+    logger: silentLogger(),
+    clock: systemClock,
+    checkReadiness,
+    isDraining,
+    webhookSecret: 'test-webhook-secret-0123456789abcdef',
+  });
 
 // A small actual body, so the early 413 can't race a large upload.
 const sendDeclaredOversizedBody = () =>

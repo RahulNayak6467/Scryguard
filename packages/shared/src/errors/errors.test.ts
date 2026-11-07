@@ -7,6 +7,7 @@ const ALL_KINDS: readonly ErrorKind[] = [
   'not_found',
   'payload_too_large',
   'internal',
+  'unauthenticated',
 ];
 
 describe('AppError', () => {

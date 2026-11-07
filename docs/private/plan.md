@@ -2,18 +2,18 @@
 
 ## Now
 
-Current phase: 1 · Vertical slice (P1.0, P1.1 done)
-Status: behind 7 h · cuts: C1 (swapped for API keys) · 21.5 / 14.5 h · Hosted $0 / $10
-P1.1 done 2026-11-07 except the Ollama `curl` check (GPU PC arrives Nov
-10; needed before P1.7). App on the personal account, installed on
-`scryguard-playground` only; config refuses bad GitHub settings (333
-tests). Tunnel: cloudflared quick tunnel (port 7844 blocked on home
-Wi-Fi; hotspot works); untick webhook Active after each session.
-Next: P1.2 break-first (15 min), then P1.3 readings (raw body, delivery
-behaviour, Stripe) and P1.3. Before `/review`: explain the syntax handover
-line by line; notes gaps (read access, events vs permissions, tunnel).
-Risk: phase 1 must close at ≤ 27.5 h; 22.5 h left for ~25.5 h of planned
-work, so ~3 h must come from stop lines. Park side questions.
+Current phase: 1 · Vertical slice (P1.0–P1.2 done, P1.3 built)
+Status: behind 6 h · cuts: C1 (swapped for API keys) · 27.5 / 21.5 h · Hosted $0 / $10
+P1.3 built and uncommitted on `feat/webhook-endpoint`: HMAC over the raw
+body, statuses 401/400/413/204/202, 20 route tests (235 green), ADR 0011.
+Real delivery from PR #1 on `scryguard-playground`: 202, ~29 KB, server
+152 ms (local ~1 ms). Ollama `curl` check still owed (GPU PC Nov 10).
+Next: `/review` of P1.3 (Core), then commit and PR; then P1.4 fakes (ship).
+Before phase `/review fresh`: explain the config syntax handover line by
+line; rebuild the P1.3 design page from memory; notes gaps (read access,
+events vs permissions, tunnel). Tunnel needs the phone hotspot.
+Risk: 16.5 h left of the 27.5 h phase cap for ~18.5 h planned; ~2 h must
+come from stop lines. Park side questions.
 
 ## Phases
 
@@ -27,7 +27,7 @@ April, summer May 1–mid-July (15-day trip inside it).
 | # | Phase | T | B | Plan | Cum | Deadline | T act | B act | Status |
 |---|---|---:|---:|---:|---:|---|---:|---:|---|
 | 0 | Foundation | 2 | 8 | 10 | 10 | Nov 5 | 2 | 14.5 | done Nov 3 |
-| 1 | Vertical slice | 6 | 24 | 30 | 40 | Dec 2 | 1.5 | 3.5 | in progress |
+| 1 | Vertical slice | 6 | 24 | 30 | 40 | Dec 2 | 3.5 | 7.5 | in progress |
 | 2 | Control plane | 14 | 48 | 62 | 102 | Dec 14 | | | |
 | 3 | Reliable processing | 12 | 48 | 60 | 162 | Dec 29 | | | |
 | R1 | Review 1 | 3 | 3 | 6 | 168 | Dec 31 | | | |
@@ -270,3 +270,10 @@ to fail when the fix is reverted.
   fallback optional; `tester` +tests, 333 green; cloudflared tunnel,
   ping round trip 404 in 0.83 s; Ollama check moved to Nov 10 ·
   Hosted $0
+- 2026-11-07 · T 2 · B 4 · P1.3 readings (Express parsers, delivery
+  behaviour, Stripe) and notes; P1.2 break-first (forged curl got 202);
+  P1.3 design (raw body via route-level `express.raw`, 1 MB in two
+  places, byte-length check, status map; page text handed over) and
+  build: webhook route, `unauthenticated` kind, Zod via `parseRequest`,
+  logs; `tester` 20 route tests, 235 green; ack ~1 ms local, real
+  delivery 202 in 152 ms, payload ~29 KB; ADR 0011 · Hosted $0
