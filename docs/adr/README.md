@@ -16,3 +16,4 @@ new record rather than rewritten.
 | [0008](0008-local-models-by-default.md) | Local models by default | Accepted |
 | [0009](0009-error-contract.md) | One error envelope, with status and retry derived from the error kind | Accepted |
 | [0010](0010-shutdown-time-budget.md) | Shutdown deadline split per step, with an HTTP drain budget | Accepted |
+| [0011](0011-webhook-verification.md) | Webhook signature verified over the raw body before parsing | Accepted |

@@ -10,6 +10,7 @@ const STATUS_BY_KIND = {
   not_found: 404,
   payload_too_large: 413,
   internal: 500,
+  unauthenticated: 401,
 } as const satisfies Record<ErrorKind, number>;
 
 const MAX_ISSUES = 10;

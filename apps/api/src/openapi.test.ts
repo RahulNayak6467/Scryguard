@@ -26,6 +26,7 @@ const createTestApp = (checkReadiness: ReadinessChecker = ready) =>
     clock: systemClock,
     checkReadiness,
     isDraining: () => false,
+    webhookSecret: 'test-webhook-secret-0123456789abcdef',
   });
 
 const strictError = z.strictObject({
