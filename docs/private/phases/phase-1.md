@@ -80,6 +80,7 @@ Each task notes its estimate and 1.5× stop line before it starts.
 - The global body limit is 1 MB; GitHub caps payloads at 25 MB. What limit does this route get, and what does GitHub see when it is exceeded?
 - A signed payload with an unexpected shape, or an event you ignore: which status, and why does it matter to GitHub's delivery log?
 - Done when: tampered body, wrong secret, missing header, wrong prefix and wrong-length signature all return 401 with no handler code run; a valid `pull_request` is acknowledged before any GitHub or model call; the ack time is measured.
+- Handed over (2026-11-07), revisit: the design page text. The user made every decision in discussion (express.raw before express.json, 1 MB enforced twice, length check before `timingSafeEqual`, signature before event type, status map 401/413/400/204/202/500, three known limitations); Claude wrote them up at the user's request. Core: the user rebuilds the page from memory before `/review`.
 
 **P1.5 Token client.**
 - How long to reuse a token, and what happens when it expires mid-request? *(open, from the design notes)*
