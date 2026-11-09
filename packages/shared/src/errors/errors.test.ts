@@ -8,6 +8,7 @@ const ALL_KINDS: readonly ErrorKind[] = [
   'payload_too_large',
   'internal',
   'unauthenticated',
+  'unsupported_media_type',
 ];
 
 describe('AppError', () => {

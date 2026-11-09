@@ -51,6 +51,7 @@ export const createApp = ({
   app.use(createRequestIdMiddleware(logger));
   app.use(createRequestLoggerMiddleware(clock, { quietPaths: ['/health/live', '/health/ready'] }));
   app.use(createBodyLimitMiddleware(MAX_REQUEST_BODY_BYTES));
+  // Before express.json: the signature is checked using raw bytes
   app.use('/webhooks/github', createWebhooksRoutes(webhookSecret, MAX_REQUEST_BODY_BYTES));
   app.use(express.json({ limit: MAX_REQUEST_BODY_BYTES }));
   app.use('/health', createHealthRoutes(checkReadiness));

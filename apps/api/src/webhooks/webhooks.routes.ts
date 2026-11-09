@@ -21,6 +21,13 @@ const pullRequestEventSchema = z.object({
 const REVIEWED_ACTIONS = new Set(['opened', 'synchronize', 'reopened']);
 const actionSchema = z.object({ action: z.string() });
 
+const invalidSignature = () =>
+  new AppError({
+    kind: 'unauthenticated',
+    code: 'INVALID_WEBHOOK_SIGNATURE',
+    message: 'Webhook signature is invalid',
+  });
+
 export const createWebhooksRoutes = (webhookSecret: string, maxRequestSize: number) => {
   const router = Router();
 
@@ -28,57 +35,39 @@ export const createWebhooksRoutes = (webhookSecret: string, maxRequestSize: numb
     '/',
     express.raw({ type: 'application/json', limit: maxRequestSize }),
     (req: Request, res: Response, next: NextFunction) => {
-      const signature = req.get('X-Hub-Signature-256');
-      if (signature === undefined) {
+      const rawBody: unknown = req.body;
+      if (!Buffer.isBuffer(rawBody)) {
         next(
           new AppError({
-            kind: 'unauthenticated',
-            code: 'INVALID_WEBHOOK_SIGNATURE',
-            message: 'Webhook signature is invalid',
+            kind: 'unsupported_media_type',
+            code: 'UNSUPPORTED_MEDIA_TYPE',
+            message: 'Webhook body must be application/json',
           }),
         );
+
+        return;
+      }
+      const signature = req.get('X-Hub-Signature-256');
+      if (signature === undefined) {
+        next(invalidSignature());
         return;
       }
       const prefix = 'sha256=';
 
       if (!signature.startsWith(prefix)) {
-        next(
-          new AppError({
-            kind: 'unauthenticated',
-            code: 'INVALID_WEBHOOK_SIGNATURE',
-            message: 'Webhook signature is invalid',
-          }),
-        );
+        next(invalidSignature());
         return;
       }
 
-      const token = signature.slice(prefix.length);
-      const rawBody: unknown = req.body;
-      if (!Buffer.isBuffer(rawBody)) {
-        next(
-          new AppError({
-            kind: 'unauthenticated',
-            code: 'INVALID_WEBHOOK_SIGNATURE',
-            message: 'Webhook signature is invalid',
-          }),
-        );
-
-        return;
-      }
+      const receivedSignature = signature.slice(prefix.length);
 
       const expectedSignature = createHmac('sha256', webhookSecret).update(rawBody).digest('hex');
 
       const expected = Buffer.from(expectedSignature);
-      const received = Buffer.from(token);
+      const received = Buffer.from(receivedSignature);
 
       if (expected.byteLength !== received.byteLength) {
-        next(
-          new AppError({
-            kind: 'unauthenticated',
-            code: 'INVALID_WEBHOOK_SIGNATURE',
-            message: 'Webhook signature is invalid',
-          }),
-        );
+        next(invalidSignature());
 
         return;
       }
@@ -86,13 +75,7 @@ export const createWebhooksRoutes = (webhookSecret: string, maxRequestSize: numb
       const signaturesMatch = timingSafeEqual(expected, received);
 
       if (!signaturesMatch) {
-        next(
-          new AppError({
-            kind: 'unauthenticated',
-            code: 'INVALID_WEBHOOK_SIGNATURE',
-            message: 'Webhook signature is invalid',
-          }),
-        );
+        next(invalidSignature());
 
         return;
       }

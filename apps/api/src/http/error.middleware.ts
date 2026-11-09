@@ -11,6 +11,7 @@ const STATUS_BY_KIND = {
   payload_too_large: 413,
   internal: 500,
   unauthenticated: 401,
+  unsupported_media_type: 415,
 } as const satisfies Record<ErrorKind, number>;
 
 const MAX_ISSUES = 10;
