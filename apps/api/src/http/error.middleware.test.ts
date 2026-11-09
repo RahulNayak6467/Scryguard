@@ -64,6 +64,7 @@ describe('error middleware', () => {
       ['not_found', 404],
       ['payload_too_large', 413],
       ['unauthenticated', 401],
+      ['unsupported_media_type', 415],
     ] satisfies [ErrorKind, number][])(
       'maps kind %s to status %i with retryable taken from the kind',
       async (kind, status) => {

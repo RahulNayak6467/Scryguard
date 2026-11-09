@@ -1,5 +1,10 @@
 export type ErrorKind =
-  'invalid_input' | 'not_found' | 'payload_too_large' | 'internal' | 'unauthenticated';
+  | 'invalid_input'
+  | 'not_found'
+  | 'payload_too_large'
+  | 'internal'
+  | 'unauthenticated'
+  | 'unsupported_media_type';
 
 export interface AppErrorOptions {
   readonly kind: ErrorKind;
@@ -14,6 +19,7 @@ export const RETRYABLE_BY_KIND = {
   payload_too_large: false,
   internal: false,
   unauthenticated: false,
+  unsupported_media_type: false,
 } as const satisfies Record<ErrorKind, boolean>;
 
 export class AppError extends Error {

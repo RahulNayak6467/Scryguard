@@ -78,7 +78,50 @@ const expectInvalidSignature = (response: request.Response) => {
   );
 };
 
+const expectUnsupportedMediaType = (response: request.Response) => {
+  expect(response.status).toBe(415);
+  expect(response.body).toEqual(
+    envelope(response, 'UNSUPPORTED_MEDIA_TYPE', 'Webhook body must be application/json'),
+  );
+};
+
 describe('github webhook route', () => {
+  describe('content type check', () => {
+    it('rejects a correctly signed form-urlencoded delivery with 415', async () => {
+      const body = pullRequestBody();
+
+      const response = await request(createTestApp())
+        .post(WEBHOOK_PATH)
+        .set('content-type', 'application/x-www-form-urlencoded')
+        .set('x-github-delivery', 'delivery-1')
+        .set('x-github-event', 'pull_request')
+        .set('x-hub-signature-256', sign(body))
+        .send(body.toString('utf8'));
+
+      expectUnsupportedMediaType(response);
+    });
+
+    it('accepts a correctly signed opened delivery with a utf-8 charset with 202', async () => {
+      const body = pullRequestBody();
+
+      const response = await request(createTestApp())
+        .post(WEBHOOK_PATH)
+        .set('content-type', 'application/json; charset=utf-8')
+        .set('x-github-delivery', 'delivery-1')
+        .set('x-github-event', 'pull_request')
+        .set('x-hub-signature-256', sign(body))
+        .send(body.toString('utf8'));
+
+      expect(response.status).toBe(202);
+    });
+
+    it('rejects a delivery without body, content type or signature with 415, not 401', async () => {
+      const response = await request(createTestApp()).post(WEBHOOK_PATH);
+
+      expectUnsupportedMediaType(response);
+    });
+  });
+
   describe('signature check', () => {
     it('rejects a delivery without a signature header with 401', async () => {
       const response = await deliver({ body: pullRequestBody(), event: 'pull_request' });
@@ -202,6 +245,40 @@ describe('github webhook route', () => {
           issues: [{ path: 'installation', message: anyMessage }],
         },
       });
+    });
+
+    it('rejects a signed issues body sent as pull_request with 400 INVALID_INPUT and does not accept it', async () => {
+      const logs = captureLogs();
+      const anyMessage: unknown = expect.any(String);
+      const body = Buffer.from(
+        JSON.stringify({
+          action: 'opened',
+          issue: { number: 12 },
+          repository: { full_name: 'octo/playground' },
+          installation: { id: 42 },
+        }),
+      );
+
+      const response = await deliver({
+        body,
+        signature: sign(body),
+        event: 'pull_request',
+        app: createTestApp(logs.logger),
+      });
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({
+        error: {
+          code: 'INVALID_INPUT',
+          message: 'Request validation failed',
+          requestId: response.headers[REQUEST_ID_HEADER],
+          retryable: false,
+          issues: [{ path: 'pull_request', message: anyMessage }],
+        },
+      });
+      expect(logs.records()).not.toContainEqual(
+        expect.objectContaining({ event: 'webhook_received', outcome: 'accepted' }),
+      );
     });
   });
 
