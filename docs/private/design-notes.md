@@ -210,6 +210,14 @@ Fields per phase: intent · decided · races and failure cases · break first
 - **Interview story.** How BOLA happens and how the schema and repository
   signatures make it impossible here.
 - **Learned.**
+  - 2026-11-09 (P1.3 review): GitHub signs only the body; `X-GitHub-Delivery`
+    and `X-GitHub-Event` are unsigned. Delivery-ID dedup (P2.3) handles
+    GitHub's own redeliveries, which keep the same ID, but not a replay,
+    which can carry a new one. The review run's unique key (repository ID,
+    PR number, head SHA), taken from the signed body and enforced by a
+    unique constraint, is what makes a replay start no new review. Use
+    repository ID, not `full_name`, which changes on rename. Test: a
+    replay with a new delivery ID creates no second run.
 
 ### Phase 3 · Reliable processing
 

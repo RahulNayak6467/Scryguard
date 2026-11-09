@@ -30,7 +30,7 @@ the checkpoint (cumulative actual ÷ plan > 1.10 → C2) is hit unless phase
 
 | Case | Problem | What changed | Scryguard takes | h | Before |
 |---|---|---|---|---:|---|
-| [Stripe: webhooks](https://docs.stripe.com/webhooks) (verify manually, replay attacks, return 2xx fast) | A captured, validly signed request can be replayed | Signed timestamp with a 5 min tolerance | GitHub signs no timestamp, so replay protection is delivery-ID dedup (P2.3); phase 1 states it as a limitation | 0.75 | P1.3 |
+| [Stripe: webhooks](https://docs.stripe.com/webhooks) (verify manually, replay attacks, return 2xx fast) | A captured, validly signed request can be replayed | Signed timestamp with a 5 min tolerance | GitHub signs no timestamp and no headers, so delivery-ID dedup alone can't stop a replay; the run key (repository ID, PR, head SHA) from the signed body does (P2.3); phase 1 states it as a limitation | 0.75 | P1.3 |
 | [GitHub: stolen OAuth tokens, April 2022](https://github.blog/news-insights/company-news/security-alert-stolen-oauth-user-tokens/) | Long-lived tokens held by Heroku and Travis CI were stolen and used to clone private repos | Tokens revoked, integrations cut off | Short-lived installation tokens, least privilege, the key outside the repo and out of logs | 0.75 | P1.1 |
 
 ### 2c. Interview extras (off the clock)
