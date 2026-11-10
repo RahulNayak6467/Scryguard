@@ -71,7 +71,7 @@ jobs:
       # Fails on breaking changes unless the PR carries the breaking-api-change label.
       - name: Check for breaking changes
         if: steps.base.outputs.skip == 'false'
-        uses: oasdiff/oasdiff-action/breaking@9e56cf8b3aff7edb326d5767d3d23f96127e20c3 # v0.1.21
+        uses: oasdiff/oasdiff-action/breaking@17214aea5113d728707fdd7d84bc811f4850fe3a # v0.1.22
         with:
           base: base-openapi.json
           revision: apps/api/openapi.json
