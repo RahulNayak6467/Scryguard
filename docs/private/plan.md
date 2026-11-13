@@ -2,18 +2,17 @@
 
 ## Now
 
-Current phase: 1 · Vertical slice (P1.0–P1.4 done; P1.3 reviewed, PR #6)
-Status: behind 6 h · cuts: C1 (swapped for API keys) · 29.5 / 23.5 h · Hosted $0 / $10
-Next (Nov 10, 3 h): Ollama `curl` check on the GPU PC; P1.5 readings and
-design page (JWT, installation tokens); start the P1.5 build.
-Day plan: Nov 12 (2 h) P1.5 end + owed + P1.6 start; Nov 13 (5 h) P1.6,
-P1.7 (GPU PC), P1.8; Nov 14 (5 h) P1.8, P1.9, P1.10; Nov 15 (5 h) P1.11,
-P1.12 (GPU PC + hotspot), `/review fresh`, `/wrap`.
-Owed before `/review fresh`: P1.3 design rebuild (user, plain English,
-checked against the code); explain the config syntax handover; notes gaps
-(read access, events vs permissions, tunnel).
-Risk: 14.5 h left of the 27.5 h phase cap for ~16 h planned; stop lines
-at 1.5× an estimate. Park side questions.
+Current phase: 1 · Vertical slice (P1.0–P1.4 done; P1.5 JWT signer done)
+Status: behind 9 h · cuts: C1 (swapped for API keys) · 32.7 / 23.5 h · Hosted $0 / $10
+Next (Nov 12, 2 h): answer the 5 questions in the auth notes; P1.5 design
+questions (refresh margin, two callers at once, failed exchange not cached,
+404 after uninstall); Solid design page; build exchange + cache vs fake GitHub.
+Day plan: Nov 13 (5 h) P1.6, P1.7 (GPU PC, ~Nov 12; if late swap with
+P1.8–P1.10 on the fake model), P1.8; Nov 14 (5 h) P1.8–P1.10; Nov 15 (5 h)
+P1.11, P1.12 (GPU PC + hotspot), `/review fresh`, `/wrap`.
+Owed before `/review fresh`: P1.3 design rebuild (plain English); config syntax explanation;
+notes gaps (read access, events vs permissions, tunnel); Ollama `curl` check.
+Risk: 11.8 h left of the 27.5 h phase cap for ~14 h planned. Park side questions.
 
 ## Phases
 
@@ -27,7 +26,7 @@ April, summer May 1–mid-July (15-day trip inside it).
 | # | Phase | T | B | Plan | Cum | Deadline | T act | B act | Status |
 |---|---|---:|---:|---:|---:|---|---:|---:|---|
 | 0 | Foundation | 2 | 8 | 10 | 10 | Nov 5 | 2 | 14.5 | done Nov 3 |
-| 1 | Vertical slice | 6 | 24 | 30 | 40 | Dec 2 | 3.5 | 9.5 | in progress |
+| 1 | Vertical slice | 6 | 24 | 30 | 40 | Dec 2 | 5.7 | 10.5 | in progress |
 | 2 | Control plane | 14 | 48 | 62 | 102 | Dec 14 | | | |
 | 3 | Reliable processing | 12 | 48 | 60 | 162 | Dec 29 | | | |
 | R1 | Review 1 | 3 | 3 | 6 | 168 | Dec 31 | | | |
@@ -284,3 +283,14 @@ to fail when the fix is reverted.
   `UNSUPPORTED_MEDIA_TYPE` before the signature, `invalidSignature()`
   helper; `tester` +4 tests, 545 green; ADR 0011 amended; PR #6 merged ·
   Hosted $0
+- 2026-11-11 · T 1.2 · B 1 · P1.5 readings (App JWT vs installation token,
+  octokit seen, custom kept → ADR 0012); `createAppJwt` (user, 3 steps):
+  caught HS256 header, `'RS256'` passed as Node digest, two clock reads;
+  `tester` 5 tests with mutation proof (`base64` vs `base64url` not caught,
+  accepted); owed: startup key-type check. GPU PC delayed to ~Nov 12 ·
+  Hosted $0
+- 2026-11-11 · T 1 · B 0 · P1.5 design: 5 min margin from `expires_at`,
+  token fetched per call, single-flight promise removed on failure,
+  in-memory Map not Redis (ADR 0012), status → retryable map, 404 final;
+  design page approved; `installation-token.ts` shell; Zod reply schema
+  handed over (syntax); key-type check found already in config · Hosted $0

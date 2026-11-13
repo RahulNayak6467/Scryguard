@@ -86,6 +86,7 @@ Each task notes its estimate and 1.5× stop line before it starts.
 - How long to reuse a token, and what happens when it expires mid-request? *(open, from the design notes)*
 - Two reviews start at once with an empty cache: how many exchanges happen, and how many should?
 - Done when: tests with a fake clock show reuse, refresh before the margin, one exchange for concurrent callers, and a failed exchange is not cached.
+- Handed over (syntax) (2026-11-11), revisit: after the design page was approved, Claude typed the Zod schema for GitHub's token reply (`token` non-empty string ≤ 255, `expires_at` ISO date-time, a message per rule). Solid: the user explains each line before `/review`.
 
 **P1.6 Redaction.**
 - `logger` stays generic. Where does the secret-shape scrub live: a hook in `logger` with patterns from the app, or in the app?
