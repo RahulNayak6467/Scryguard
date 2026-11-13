@@ -15,7 +15,8 @@ export type RespondReply = {
   delayMs: number;
 };
 
-export type FakeReply = RespondReply | { kind: 'hang' } | { kind: 'drop' };
+export type FakeReply =
+  RespondReply | { kind: 'hang' } | { kind: 'drop' } | { kind: 'cut'; reply: RespondReply };
 
 export interface FakeServer {
   url: string;
@@ -53,6 +54,8 @@ export const hang = (): FakeReply => ({ kind: 'hang' });
 
 export const drop = (): FakeReply => ({ kind: 'drop' });
 
+export const cutBody = (reply: RespondReply): FakeReply => ({ kind: 'cut', reply });
+
 export const startFakeServer = async (
   route: (request: RecordedRequest) => FakeReply,
 ): Promise<FakeServer> => {
@@ -81,6 +84,15 @@ export const startFakeServer = async (
       if (reply.kind === 'hang') return;
       if (reply.kind === 'drop') {
         req.socket.destroy();
+        return;
+      }
+      if (reply.kind === 'cut') {
+        const full = Buffer.from(reply.reply.body, 'utf8');
+        res.writeHead(reply.reply.status, {
+          ...reply.reply.headers,
+          'content-length': String(full.length),
+        });
+        res.write(full.subarray(0, Math.floor(full.length / 2)), () => req.socket.destroy());
         return;
       }
 
