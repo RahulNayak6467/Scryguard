@@ -12,6 +12,7 @@ const STATUS_BY_KIND = {
   internal: 500,
   unauthenticated: 401,
   unsupported_media_type: 415,
+  upstream_unavailable: 503,
 } as const satisfies Record<ErrorKind, number>;
 
 const MAX_ISSUES = 10;

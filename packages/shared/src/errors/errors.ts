@@ -4,7 +4,8 @@ export type ErrorKind =
   | 'payload_too_large'
   | 'internal'
   | 'unauthenticated'
-  | 'unsupported_media_type';
+  | 'unsupported_media_type'
+  | 'upstream_unavailable';
 
 export interface AppErrorOptions {
   readonly kind: ErrorKind;
@@ -20,6 +21,7 @@ export const RETRYABLE_BY_KIND = {
   internal: false,
   unauthenticated: false,
   unsupported_media_type: false,
+  upstream_unavailable: true,
 } as const satisfies Record<ErrorKind, boolean>;
 
 export class AppError extends Error {
