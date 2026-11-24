@@ -89,7 +89,7 @@ services:
       start_period: 5s
 
   rustfs-init:
-    image: amazon/aws-cli:2.39.3@sha256:d557b3524475d70dd3104cf44d96568ee3188897b73a6ece2b37aa50e1af362f
+    image: amazon/aws-cli:2.42.1@sha256:b0102d2269f87d8531d931c1a59e248101ace586886e6c077058d94c1c37b846
     container_name: scryguard-rustfs-init
     restart: 'no'
     depends_on:
